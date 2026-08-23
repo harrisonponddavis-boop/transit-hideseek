@@ -485,14 +485,16 @@ a { color: var(--amber); }
 
 /* small Street View controls (bottom-left) for the final catch */
 .imm-sv-controls { position: absolute; left: 16px; bottom: 16px; z-index: 30; display: flex; gap: 10px; }
+/* sleek yellow-on-black button used across the phone */
 .sv-btn {
-  font-family: var(--mono); font-size: 12px; letter-spacing: 0.04em;
-  background: rgba(12, 14, 18, 0.82); color: var(--bone);
-  border: 1px solid var(--edge); border-radius: 10px; padding: 10px 14px; cursor: pointer;
-  backdrop-filter: blur(6px);
+  font-family: var(--mono); font-size: 12px; font-weight: 600; letter-spacing: 0.04em;
+  background: rgba(8, 9, 12, 0.86); color: #ffb000;
+  border: 1px solid rgba(255, 176, 0, 0.45); border-radius: 11px; padding: 10px 15px; cursor: pointer;
+  backdrop-filter: blur(6px); transition: background 0.12s, color 0.12s, border-color 0.12s;
 }
-.sv-btn:hover { border-color: var(--amber); }
-.sv-btn.ghost { opacity: 0.85; }
+.sv-btn:hover { background: #ffb000; color: #0b0d11; border-color: #ffb000; }
+.sv-btn.ghost { color: #d7d2c4; border-color: rgba(255, 176, 0, 0.28); }
+.sv-btn.ghost:hover { background: #ffb000; color: #0b0d11; }
 
 /* phone launcher (bottom-right) */
 .phone-launch {
@@ -597,11 +599,13 @@ a { color: var(--amber); }
 .tray-label { font-family: var(--mono); font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.12em; margin: 2px 4px 8px; }
 .chip-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; max-height: 168px; overflow-y: auto; }
 .qchip { display: flex; justify-content: space-between; align-items: center; gap: 6px; text-align: left;
-  font-family: var(--mono); font-size: 11px; background: #181c25; color: var(--bone);
-  border: 1px solid var(--edge); border-radius: 999px; padding: 8px 12px; cursor: pointer; }
-.qchip:hover { border-color: var(--amber); }
-.qchip:disabled { opacity: 0.4; cursor: default; }
-.qc-cost { color: var(--amber); flex: none; }
+  font-family: var(--mono); font-size: 11px; font-weight: 600; background: #0d0f14; color: #ffb000;
+  border: 1px solid rgba(255, 176, 0, 0.4); border-radius: 999px; padding: 9px 13px; cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s; }
+.qchip:hover:not(:disabled) { background: #ffb000; color: #0b0d11; border-color: #ffb000; }
+.qchip:hover:not(:disabled) .qc-cost { color: #0b0d11; }
+.qchip:disabled { opacity: 0.32; cursor: default; }
+.qc-cost { color: #ffb000; flex: none; }
 
 /* maps app (fullscreen) */
 .maps-fullscreen { position: absolute; inset: 0; z-index: 70; background: #000; }
@@ -610,7 +614,18 @@ a { color: var(--amber); }
    button on the right, away from the map's top-left zoom buttons */
 .maps-topbar { position: absolute; top: 0; left: 0; right: 0; z-index: 1200; display: flex; flex-direction: row-reverse;
   align-items: center; gap: 14px; padding: 12px 16px; background: linear-gradient(180deg, rgba(6,8,12,0.92), rgba(6,8,12,0)); }
-.maps-back { font-family: var(--mono); font-size: 13px; background: rgba(12,14,18,0.9); color: var(--bone);
-  border: 1px solid var(--edge); border-radius: 10px; padding: 9px 14px; cursor: pointer; }
-.maps-back:hover { border-color: var(--amber); }
-.maps-hint { font-family: var(--mono); font-size: 11px; color: var(--bone); opacity: 0.85; }
+.maps-back { font-family: var(--mono); font-size: 13px; font-weight: 600; background: rgba(8,9,12,0.9); color: #ffb000;
+  border: 1px solid rgba(255,176,0,0.5); border-radius: 11px; padding: 9px 15px; cursor: pointer; transition: background 0.12s, color 0.12s; }
+.maps-back:hover { background: #ffb000; color: #0b0d11; border-color: #ffb000; }
+.maps-hint { font-family: var(--mono); font-size: 11px; color: #ffce5c; opacity: 0.92; }
+
+/* map preview toolbar (bottom of the fullscreen Maps app) */
+.map-tools { position: absolute; left: 0; right: 0; bottom: 0; z-index: 1200;
+  display: flex; gap: 8px; overflow-x: auto; padding: 14px 16px 18px;
+  background: linear-gradient(0deg, rgba(6,8,12,0.94) 40%, rgba(6,8,12,0)); }
+.map-tools::-webkit-scrollbar { height: 0; }
+.map-tool { flex: none; font-family: var(--mono); font-size: 12px; font-weight: 600; letter-spacing: 0.02em;
+  background: #0d0f14; color: #ffb000; border: 1px solid rgba(255,176,0,0.45); border-radius: 999px;
+  padding: 9px 15px; cursor: pointer; white-space: nowrap; transition: background 0.12s, color 0.12s, border-color 0.12s; }
+.map-tool:hover { border-color: #ffb000; }
+.map-tool.on { background: #ffb000; color: #0b0d11; border-color: #ffb000; box-shadow: 0 0 16px rgba(255,176,0,0.35); }

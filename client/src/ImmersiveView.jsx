@@ -280,6 +280,8 @@ function TextsApp({ state, network, act, hiderName }) {
 }
 
 function MapsApp({ network, state, onBack }) {
+  // which question to "preview" on the map — same graphics the game map uses
+  const [sel, setSel] = useState(null);
   const guesses = state.feed.filter((f) => f.kind === 'guess' && f.lat);
   const radarHistory = state.feed
     .filter((f) => f.type === 'radar' && f.center)
@@ -292,6 +294,10 @@ function MapsApp({ network, state, onBack }) {
     },
     [network, state.feed.length]
   );
+  const tools = previewTools(network);
+  const active = tools.find((t) => t.key === sel);
+  const toggle = (key) => setSel((cur) => (cur === key ? null : key));
+
   return (
     <div className="maps-fullscreen">
       <MapView
@@ -304,14 +310,45 @@ function MapsApp({ network, state, onBack }) {
         possibleZones={possibleZones}
         travelTimes={state.travelTimes}
         guesses={guesses}
+        preview={active?.pv || null}
         clickMode={null}
       />
       <div className="maps-topbar">
         <button className="maps-back" onClick={onBack}>‹ Back to phone</button>
-        <span className="maps-hint">Planning only — shaded areas are ruled out. Ride from the Bus Schedule.</span>
+        <span className="maps-hint">
+          {active ? active.hint : 'Tap a question below to preview how it splits the map. Shaded areas are already ruled out.'}
+        </span>
+      </div>
+      <div className="map-tools">
+        {tools.map((t) => (
+          <button key={t.key} className={`map-tool ${sel === t.key ? 'on' : ''}`} onClick={() => toggle(t.key)}>
+            {t.label}
+          </button>
+        ))}
       </div>
     </div>
   );
+}
+
+// The questions you can preview on the map, in the exact `preview` shapes the
+// game's MapView already knows how to draw.
+function previewTools(network) {
+  const t = [
+    { key: 'r05', label: 'Radar 0.5km', pv: { type: 'radar', radiusKm: 0.5 }, hint: 'Radar 0.5km — the hider is inside or outside this ring.' },
+    { key: 'r1', label: 'Radar 1km', pv: { type: 'radar', radiusKm: 1 }, hint: 'Radar 1km — the hider is inside or outside this ring.' },
+    { key: 'r2', label: 'Radar 2km', pv: { type: 'radar', radiusKm: 2 }, hint: 'Radar 2km — the hider is inside or outside this ring.' },
+    { key: 'r5', label: 'Radar 5km', pv: { type: 'radar', radiusKm: 5 }, hint: 'Radar 5km — the hider is inside or outside this ring.' },
+    { key: 'cns', label: 'Compass N/S', pv: { type: 'compass', axis: 'ns' }, hint: 'Compass N/S — splits the map north vs south of you.' },
+    { key: 'cew', label: 'Compass E/W', pv: { type: 'compass', axis: 'ew' }, hint: 'Compass E/W — splits the map east vs west of you.' },
+    { key: 'line', label: 'Same line', pv: { type: 'lines' }, hint: 'Same line — highlights every station sharing a line with you.' },
+    { key: 'stn', label: 'Right station', pv: { type: 'station' }, hint: 'Right station — is your current station the hider’s home?' },
+  ];
+  (network?.matchCategories || []).forEach((c) =>
+    t.push({ key: `m${c.id}`, label: c.region ? `Same ${c.label}` : `Near ${c.label}`, pv: { type: 'match', category: c.id },
+      hint: `Matching — do you share the same ${c.label} region as the hider?` }));
+  t.push({ key: 'r100', label: 'Radar 100m', pv: { type: 'radar', radiusKm: 0.1 }, hint: 'Radar 100m — endgame ring right around you.' });
+  t.push({ key: 'r250', label: 'Radar 250m', pv: { type: 'radar', radiusKm: 0.25 }, hint: 'Radar 250m — endgame ring around you.' });
+  return t;
 }
 
 // The first line serving a station gives its dot colour on the schedule.

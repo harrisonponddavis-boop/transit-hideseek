@@ -19,6 +19,7 @@ const RULES = {
   MAX_WALK_METERS: 1500,    // per walking leg
   GUESS_RANGE_METERS: 50,   // pins must be dropped this close to where you stand
   WIN_RADIUS_OPTIONS: [10, 15, 25, 50], // host picks one in the lobby
+  MAX_BUS_WAIT_MINS: 10,    // next-bus wait is a random 1..this, added on ride
 };
 
 const QUESTION_DEFS = {
@@ -277,6 +278,20 @@ function rideCoins(rideMins) {
   return Math.max(RULES.MIN_RIDE_COINS, Math.round(rideMins * RULES.RIDE_COIN_RATE));
 }
 
+// Minutes until the next bus to a destination. Deterministic from where you
+// stand, the destination, and the current clock — so it's stable while you
+// plan, matches what you're charged when you ride, and refreshes every time
+// the clock moves (a ride or a walk). Feels like catching a real bus.
+function busWait(game, toStationId) {
+  const seed = `${game.seekerStation}|${toStationId}|${game.clock}`;
+  let h = 2166136261;
+  for (let i = 0; i < seed.length; i++) {
+    h ^= seed.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return 1 + ((h >>> 0) % RULES.MAX_BUS_WAIT_MINS); // 1..MAX
+}
+
 function move(game, toStationId) {
   const city = cityOf(game);
   if (!city.stations[toStationId]) return { error: 'Unknown station' };
@@ -285,14 +300,15 @@ function move(game, toStationId) {
   const rideMins = times[toStationId] || 0;
   // walked seekers first walk back to their station before riding
   const walkBack = game.walkPos ? walkMinutes(game.walkPos, city.stations[game.seekerStation]) : 0;
-  const mins = rideMins + walkBack;
+  const waitMins = busWait(game, toStationId); // time spent waiting for the next bus
+  const mins = rideMins + walkBack + waitMins;
   const earned = rideCoins(rideMins);
   game.clock += mins;
   game.coins += earned;
   game.feed.push({
     kind: 'move', clock: game.clock,
-    from: game.seekerStation, to: toStationId, mins,
-    text: `Seekers ${walkBack ? `walked back to ${city.stations[game.seekerStation].name} and ` : ''}rode to ${city.stations[toStationId].name} (${mins} min, +${earned} coins)`,
+    from: game.seekerStation, to: toStationId, mins, waitMins,
+    text: `Seekers ${walkBack ? `walked back to ${city.stations[game.seekerStation].name} and ` : ''}waited ${waitMins} min, then rode to ${city.stations[toStationId].name} (${mins} min total, +${earned} coins)`,
   });
   game.seekerStation = toStationId;
   game.walkPos = null;
@@ -503,6 +519,8 @@ function viewFor(game, playerId) {
     const t = city.travelTimes(game.seekerStation);
     const wb = game.walkPos ? walkMinutes(game.walkPos, city.stations[game.seekerStation]) : 0;
     base.travelTimes = Object.fromEntries(Object.entries(t).map(([k, v]) => [k, v + wb]));
+    // next-bus wait for each destination, shown in the Bus Schedule app
+    base.busWaits = Object.fromEntries(Object.keys(t).map((k) => [k, busWait(game, k)]));
   }
   return base;
 }

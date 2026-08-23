@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Immersive mockup — Transit Hide+Seek</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --amber:#ffb000; --bone:#e8e4d8; --muted:#9aa0ad; --ink:#0b0d11; --edge:#2a3140;
+    --display:'Barlow Condensed',sans-serif; --mono:'IBM Plex Mono',monospace;
+  }
+  *{box-sizing:border-box;margin:0;-webkit-user-select:none;user-select:none}
+  html,body{height:100%}
+  body{background:#000;font-family:var(--mono);color:var(--bone);overflow:hidden}
+  #stage{position:fixed;inset:0;overflow:hidden;cursor:grab}
+  #stage.drag{cursor:grabbing}
+
+  /* faux street view: a panoramic city that scrolls as you look around */
+  #pano{position:absolute;top:0;left:0;height:100%;width:300%;will-change:transform}
+  .sky{position:absolute;inset:0;background:linear-gradient(#9fc3e8 0%,#cfe0ef 42%,#e8ddcb 60%,#d8cbb4 100%)}
+  .ground{position:absolute;left:0;right:0;bottom:0;height:38%;background:linear-gradient(#6f7681,#3c4047)}
+  .road{position:absolute;left:0;right:0;bottom:0;height:38%;
+        background:radial-gradient(120% 140% at 50% 120%,#54585f 0%,#3a3d43 60%,transparent 61%)}
+  .skyline{position:absolute;bottom:34%;left:0;right:0;height:46%}
+  .bld{position:absolute;bottom:0;background:#2d333d;border:1px solid #232932}
+  .bld::before{content:"";position:absolute;inset:8px 6px;
+    background:
+      repeating-linear-gradient(#0000 0 6px,#475066 6px 12px),
+      repeating-linear-gradient(90deg,#0000 0 7px,#3a4154 7px 14px);
+    opacity:.6}
+  .hl{position:absolute;top:0;left:0;right:0;height:34%;}
+
+  /* top HUD */
+  .hud{position:absolute;top:0;left:0;right:0;display:flex;align-items:center;gap:18px;
+       padding:12px 18px;z-index:30;
+       background:linear-gradient(#0b0d11dd,#0b0d1100)}
+  .hud h1{font-family:var(--display);font-weight:700;letter-spacing:.12em;font-size:20px;text-transform:uppercase;color:var(--amber)}
+  .hud h1 span{color:var(--bone)}
+  .stat{margin-left:auto;display:flex;gap:20px;align-items:center}
+  .stat .lbl{display:block;font-size:9px;letter-spacing:.18em;color:var(--muted);text-transform:uppercase}
+  .stat b{font-family:var(--display);font-weight:700;font-size:20px;color:var(--amber);font-variant-numeric:tabular-nums}
+  .here{position:absolute;top:54px;left:50%;transform:translateX(-50%);z-index:30;
+        font-family:var(--display);letter-spacing:.16em;text-transform:uppercase;font-size:13px;color:var(--bone);
+        background:#0b0d11aa;padding:4px 14px;border:1px solid var(--edge)}
+
+  /* compass strip */
+  .compass{position:absolute;top:90px;left:50%;transform:translateX(-50%);z-index:25;
+           width:280px;height:22px;overflow:hidden;opacity:.85}
+  .compass .tickrow{position:absolute;top:0;left:0;height:100%;display:flex;align-items:center}
+  .compass .tick{position:absolute;top:0;font-size:10px;color:var(--muted);transform:translateX(-50%);letter-spacing:.1em}
+  .compass .mid{position:absolute;top:0;bottom:0;left:50%;width:1px;background:var(--amber)}
+
+  /* floating station buttons */
+  .stbtn{position:absolute;z-index:20;transform:translate(-50%,-50%);
+         display:flex;align-items:center;gap:8px;padding:8px 12px;cursor:pointer;
+         background:#0b0d11e6;border:1px solid var(--amber);
+         font-family:var(--mono);white-space:nowrap;transition:opacity .12s}
+  .stbtn .dot{width:10px;height:10px;border-radius:50%;flex:none}
+  .stbtn .nm{font-family:var(--display);font-weight:600;letter-spacing:.06em;font-size:15px;text-transform:uppercase}
+  .stbtn .meta{font-size:11px;color:var(--amber)}
+  .stbtn .ico{color:var(--amber);font-size:13px}
+  .stbtn:hover{background:#161a22}
+  /* edge nudge when a station is behind you */
+  .nudge{position:absolute;z-index:20;top:50%;transform:translateY(-50%);
+         display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;
+         color:var(--amber);font-size:11px;letter-spacing:.06em}
+  .nudge .arr{font-size:26px;line-height:1}
+  .nudge.left{left:14px}.nudge.right{right:14px}
+  .nudge .nm{font-family:var(--display);font-weight:600;font-size:12px;text-transform:uppercase;color:var(--bone);max-width:90px;text-align:center}
+
+  /* walk arrows (Google-style step) */
+  .walk{position:absolute;left:50%;bottom:120px;transform:translateX(-50%);z-index:18;
+        width:60px;height:60px;border-radius:50%;border:1px solid var(--bone);
+        background:#0b0d1199;display:flex;align-items:center;justify-content:center;color:var(--bone);font-size:26px;cursor:pointer}
+  .walk:hover{background:#161a22}
+
+  /* bottom-left actions */
+  .actions{position:absolute;left:16px;bottom:16px;z-index:30;display:flex;gap:10px}
+  .btn{font-family:var(--display);font-weight:600;letter-spacing:.1em;text-transform:uppercase;font-size:15px;
+       padding:11px 18px;cursor:pointer;background:var(--amber);color:#1a1404;border:none}
+  .btn.ghost{background:#0b0d11cc;color:var(--amber);border:1px solid var(--amber)}
+
+  /* pull-out map */
+  .mapwrap{position:absolute;right:16px;bottom:16px;z-index:30;transition:all .2s ease}
+  .mapwrap.small{width:210px;height:150px}
+  .mapwrap.small:hover{width:340px;height:240px}
+  .mapwrap.big{width:min(560px,70vw);height:min(440px,70vh)}
+  .mapcard{width:100%;height:100%;border:1px solid var(--amber);background:#10131a;position:relative;overflow:hidden}
+  .maptab{position:absolute;top:-1px;right:-1px;z-index:2;background:var(--amber);color:#1a1404;
+          font-family:var(--display);font-weight:600;letter-spacing:.1em;font-size:12px;text-transform:uppercase;
+          padding:5px 10px;cursor:pointer}
+  .maphint{position:absolute;left:8px;bottom:6px;font-size:10px;color:var(--muted);letter-spacing:.08em}
+
+  /* question panel */
+  .qpanel{position:absolute;left:16px;bottom:74px;z-index:35;width:300px;
+          background:#0b0d11f2;border:1px solid var(--edge);border-top:3px solid var(--amber);padding:14px;display:none}
+  .qpanel.open{display:block}
+  .qpanel h3{font-family:var(--display);font-size:15px;letter-spacing:.16em;text-transform:uppercase;color:var(--amber);margin-bottom:10px}
+  .qgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .qbtn{background:#161a22;border:1px solid var(--edge);color:var(--bone);font-family:var(--mono);font-size:12px;padding:9px;text-align:left;cursor:pointer}
+  .qbtn .c{color:var(--amber);float:right}
+  .qbtn:hover{border-color:var(--amber)}
+
+  .hint{position:absolute;left:50%;top:48%;transform:translateX(-50%);z-index:15;color:#fff9;
+        font-size:13px;letter-spacing:.1em;text-transform:uppercase;font-family:var(--display);
+        background:#0008;padding:6px 14px;animation:fade 4s forwards}
+  @keyframes fade{0%,70%{opacity:1}100%{opacity:0}}
+  .tag{position:absolute;left:16px;top:120px;z-index:30;font-size:11px;color:var(--muted);max-width:230px;line-height:1.5}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="pano">
+    <div class="sky"></div>
+    <div class="skyline" id="skyline"></div>
+    <div class="ground"></div>
+    <div class="road"></div>
+  </div>
+
+  <div class="hint">drag to look around</div>
+
+  <div class="hud">
+    <h1>Transit <span>Hide+Seek</span></h1>
+    <div class="stat">
+      <div><span class="lbl">Clock</span><b>23 min</b></div>
+      <div><span class="lbl">Coins</span><b>14</b></div>
+      <div><span class="lbl">Room</span><b>GMX5</b></div>
+    </div>
+  </div>
+  <div class="here">Castro Station · San Francisco</div>
+  <div class="compass"><div class="tickrow" id="ticks"></div><div class="mid"></div></div>
+
+  <div class="tag">You're standing in the Castro. Turn to face a line and ride it — or walk the block with the road arrows.</div>
+
+  <div id="buttons"></div>
+
+  <div class="walk" title="Walk forward">↑</div>
+
+  <div class="actions">
+    <button class="btn" id="askBtn">Ask</button>
+    <button class="btn ghost">Drop pin</button>
+  </div>
+
+  <div class="qpanel" id="qpanel">
+    <h3>Ask the hider</h3>
+    <div class="qgrid">
+      <button class="qbtn">Radar 1km <span class="c">4¢</span></button>
+      <button class="qbtn">Thermometer <span class="c">free</span></button>
+      <button class="qbtn">Same borough <span class="c">4¢</span></button>
+      <button class="qbtn">Compass N/S <span class="c">5¢</span></button>
+    </div>
+  </div>
+
+  <div class="mapwrap small" id="mapwrap">
+    <div class="mapcard">
+      <div class="maptab" id="maptab">Map ⤢</div>
+      <svg id="mapsvg" width="100%" height="100%" viewBox="0 0 560 440" preserveAspectRatio="xMidYMid slice"></svg>
+      <div class="maphint">tap to expand</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const STATIONS = [
+  {name:'Church', bearing:52,  mins:2, color:'#bcb39d'},
+  {name:'Church & 18th', bearing:108, mins:3, color:'#f1a93b'},
+  {name:'Forest Hill', bearing:239, mins:3, color:'#bcb39d'},
+];
+const FOV = 64;
+let heading = 52, dragging=false, lastX=0;
+
+const skyline = document.getElementById('skyline');
+let bldHTML='';
+for(let i=0;i<60;i++){
+  const w=26+Math.round(Math.random()*46), h=30+Math.round(Math.random()*120);
+  const left=i*48 + Math.round(Math.random()*8);
+  bldHTML += `<div class="bld" style="left:${left}px;width:${w}px;height:${h}px"></div>`;
+}
+skyline.innerHTML=bldHTML;
+
+const stage=document.getElementById('stage');
+const pano=document.getElementById('pano');
+const btnWrap=document.getElementById('buttons');
+const ticks=document.getElementById('ticks');
+
+function norm(a){return ((a%360)+540)%360-180;}
+
+function render(){
+  pano.style.transform = `translateX(${ -(heading/360)*window.innerWidth*2 - window.innerWidth*0.5 }px)`;
+  btnWrap.innerHTML='';
+  for(const s of STATIONS){
+    const d = norm(s.bearing - heading);
+    if(Math.abs(d) <= FOV/2){
+      const x = 50 + (d/(FOV/2))*44;
+      const el=document.createElement('div');
+      el.className='stbtn';
+      el.style.left=x+'%'; el.style.top='56%';
+      el.innerHTML=`<span class="dot" style="background:${s.color}"></span>
+        <span><span class="nm">${s.name}</span><br><span class="meta">ride · ${s.mins} min · +${Math.max(2,Math.round(s.mins*.5))}¢</span></span>
+        <span class="ico">▸</span>`;
+      btnWrap.appendChild(el);
+    } else {
+      const side = d>0 ? 'right':'left';
+      const el=document.createElement('div');
+      el.className='nudge '+side;
+      el.innerHTML=`<span class="arr">${side==='left'?'‹':'›'}</span><span class="nm">${s.name}</span><span style="color:var(--amber)">turn</span>`;
+      btnWrap.appendChild(el);
+    }
+  }
+  ticks.innerHTML='';
+  for(let b=0;b<360;b+=45){
+    const d=norm(b-heading);
+    if(Math.abs(d)<=40){
+      const x=140 + (d/40)*140;
+      const lbl={0:'N',45:'NE',90:'E',135:'SE',180:'S',225:'SW',270:'W',315:'NW'}[b];
+      ticks.innerHTML+=`<span class="tick" style="left:${x}px">${lbl}</span>`;
+    }
+  }
+}
+
+stage.addEventListener('pointerdown',e=>{if(e.target.closest('.mapwrap,.actions,.qpanel,.stbtn,.nudge,.walk'))return;dragging=true;lastX=e.clientX;stage.classList.add('drag');});
+window.addEventListener('pointermove',e=>{if(!dragging)return;heading=( heading + (e.clientX-lastX)*0.22 +360)%360;lastX=e.clientX;render();});
+window.addEventListener('pointerup',()=>{dragging=false;stage.classList.remove('drag');});
+
+document.getElementById('askBtn').onclick=()=>document.getElementById('qpanel').classList.toggle('open');
+const mapwrap=document.getElementById('mapwrap');
+document.getElementById('maptab').onclick=(e)=>{e.stopPropagation();mapwrap.classList.toggle('big');mapwrap.classList.toggle('small');};
+mapwrap.onclick=()=>{if(mapwrap.classList.contains('small')){mapwrap.classList.remove('small');mapwrap.classList.add('big');}};
+
+const mapsvg=document.getElementById('mapsvg');
+const lines=[
+  {c:'#bcb39d',pts:[[120,120],[200,170],[280,210],[360,250],[430,300]]},
+  {c:'#f1a93b',pts:[[280,210],[300,300],[330,380]]},
+  {c:'#0099d8',pts:[[60,260],[180,250],[280,210],[420,160],[520,120]]},
+];
+let svg='';
+svg+='<rect x="0" y="0" width="560" height="440" fill="#0d1016"/>';
+for(const l of lines){svg+=`<polyline points="${l.pts.map(p=>p.join(',')).join(' ')}" fill="none" stroke="${l.c}" stroke-width="4" opacity=".8"/>`;}
+const possible=[[200,170],[280,210],[300,300],[360,250]];
+for(const p of possible){svg+=`<circle cx="${p[0]}" cy="${p[1]}" r="46" fill="#ffb000" opacity=".12"/>`;}
+svg+='<rect x="360" y="0" width="200" height="440" fill="#000" opacity=".28"/>';
+svg+='<rect x="0" y="330" width="560" height="110" fill="#000" opacity=".28"/>';
+for(const l of lines)for(const p of l.pts){svg+=`<circle cx="${p[0]}" cy="${p[1]}" r="5" fill="#0b0d11" stroke="#e8e4d8" stroke-width="2"/>`;}
+svg+='<circle cx="280" cy="210" r="8" fill="#ffb000" stroke="#1a1404" stroke-width="2"/>';
+mapsvg.innerHTML=svg;
+
+render();
+window.addEventListener('resize',render);
+</script>
+</body>
+</html>

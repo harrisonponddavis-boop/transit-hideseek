@@ -1,0 +1,95 @@
+// New York City — a focused slice of the subway across all five boroughs.
+// Not the whole system: a few stations per borough, with the real transfer
+// hubs shared between lines so the network is one connected graph. The
+// Staten Island Ferry is modeled as a "line" so SI connects to Manhattan.
+// Coordinates are approximate; good enough for gameplay, not navigation.
+
+module.exports = {
+  id: 'nyc',
+  name: 'New York City',
+  center: [40.735, -73.95],
+  zoom: 11,
+  startStation: 'TSQ',
+  stations: {
+    // --- Manhattan ---
+    TSQ:    { id: 'TSQ',    name: 'Times Sq–42 St',          lat: 40.7557, lng: -73.9869 },
+    GCT:    { id: 'GCT',    name: 'Grand Central–42 St',     lat: 40.7527, lng: -73.9772 },
+    HER:    { id: 'HER',    name: '34 St–Herald Sq',         lat: 40.7497, lng: -73.9876 },
+    PENN:   { id: 'PENN',   name: '34 St–Penn Station',      lat: 40.7506, lng: -73.9910 },
+    US14:   { id: 'US14',   name: '14 St–Union Sq',          lat: 40.7359, lng: -73.9911 },
+    W4:     { id: 'W4',     name: 'W 4 St–Washington Sq',    lat: 40.7322, lng: -74.0006 },
+    PABT:   { id: 'PABT',   name: '42 St–Port Authority',    lat: 40.7570, lng: -73.9899 },
+    CANAL:  { id: 'CANAL',  name: 'Canal St',                lat: 40.7190, lng: -74.0006 },
+    CHAM:   { id: 'CHAM',   name: 'Chambers St',             lat: 40.7155, lng: -74.0091 },
+    FULTON: { id: 'FULTON', name: 'Fulton St',               lat: 40.7100, lng: -74.0078 },
+    SFERRY: { id: 'SFERRY', name: 'South Ferry',             lat: 40.7019, lng: -74.0132 },
+    CC59:   { id: 'CC59',   name: '59 St–Columbus Circle',   lat: 40.7681, lng: -73.9819 },
+    L59:    { id: 'L59',    name: '59 St–Lexington Av',       lat: 40.7626, lng: -73.9678 },
+    L86:    { id: 'L86',    name: '86 St–Lexington Av',       lat: 40.7794, lng: -73.9558 },
+    L125:   { id: 'L125',   name: '125 St–Lexington Av',      lat: 40.8045, lng: -73.9374 },
+    UWS86:  { id: 'UWS86',  name: '86 St–Broadway',          lat: 40.7886, lng: -73.9760 },
+    UWS125: { id: 'UWS125', name: '125 St–Broadway',         lat: 40.8158, lng: -73.9585 },
+    L14_8:  { id: 'L14_8',  name: '14 St–8 Av',              lat: 40.7400, lng: -74.0024 },
+    // --- The Bronx (north end of the Lexington line) ---
+    B149:   { id: 'B149',   name: '149 St–Grand Concourse',  lat: 40.8183, lng: -73.9269 },
+    B161:   { id: 'B161',   name: '161 St–Yankee Stadium',   lat: 40.8276, lng: -73.9277 },
+    BFORD:  { id: 'BFORD',  name: 'Fordham Rd',              lat: 40.8619, lng: -73.9013 },
+    // --- Brooklyn ---
+    BORO:   { id: 'BORO',   name: 'Borough Hall',            lat: 40.6932, lng: -73.9901 },
+    ATL:    { id: 'ATL',    name: 'Atlantic Av–Barclays Ctr',lat: 40.6840, lng: -73.9777 },
+    DEKALB: { id: 'DEKALB', name: 'DeKalb Av',               lat: 40.6896, lng: -73.9817 },
+    JAY:    { id: 'JAY',    name: 'Jay St–MetroTech',        lat: 40.6924, lng: -73.9874 },
+    BEDFD:  { id: 'BEDFD',  name: 'Bedford Av',              lat: 40.7173, lng: -73.9566 },
+    CONEY:  { id: 'CONEY',  name: 'Coney Island–Stillwell',  lat: 40.5772, lng: -73.9812 },
+    // --- Queens ---
+    COURT:  { id: 'COURT',  name: 'Court Sq',                lat: 40.7470, lng: -73.9454 },
+    QBP:    { id: 'QBP',    name: 'Queensboro Plaza',        lat: 40.7510, lng: -73.9402 },
+    JKHTS:  { id: 'JKHTS',  name: 'Jackson Hts–Roosevelt Av',lat: 40.7466, lng: -73.8913 },
+    FLUSH:  { id: 'FLUSH',  name: 'Flushing–Main St',        lat: 40.7596, lng: -73.8302 },
+    // --- Staten Island (via the ferry) ---
+    STGEO:  { id: 'STGEO',  name: 'St George',               lat: 40.6437, lng: -74.0735 },
+    TOMPK:  { id: 'TOMPK',  name: 'Tompkinsville',           lat: 40.6366, lng: -74.0747 },
+  },
+  lines: [
+    { id: '1', name: '1 · Broadway–7 Av', color: '#ee352e',
+      stops: ['UWS125', 'UWS86', 'CC59', 'TSQ', 'PENN', 'CHAM', 'SFERRY'],
+      hops: [5, 4, 3, 3, 4, 2] },
+    { id: '456', name: '4·5·6 · Lexington Av', color: '#00933c',
+      stops: ['BFORD', 'B161', 'B149', 'L125', 'L86', 'L59', 'GCT', 'US14', 'BORO', 'ATL'],
+      hops: [4, 3, 3, 4, 3, 3, 4, 5, 3] },
+    { id: 'NQRW', name: 'N·Q·R·W · Broadway', color: '#fccc0a',
+      stops: ['TSQ', 'HER', 'US14', 'CANAL', 'DEKALB', 'ATL', 'CONEY'],
+      hops: [2, 3, 3, 4, 2, 18] },
+    { id: 'ACE', name: 'A·C·E · 8 Av', color: '#0039a6',
+      stops: ['CC59', 'PABT', 'PENN', 'W4', 'FULTON', 'JAY'],
+      hops: [2, 2, 3, 4, 3] },
+    { id: '7', name: '7 · Flushing', color: '#b933ad',
+      stops: ['TSQ', 'GCT', 'COURT', 'QBP', 'JKHTS', 'FLUSH'],
+      hops: [2, 4, 2, 5, 6] },
+    { id: 'L', name: 'L · 14 St–Canarsie', color: '#a7a9ac',
+      stops: ['L14_8', 'US14', 'BEDFD'],
+      hops: [3, 4] },
+    { id: 'SI', name: 'Staten Island Ferry + Railway', color: '#1b6cb3',
+      stops: ['SFERRY', 'STGEO', 'TOMPK'],
+      hops: [25, 4] },
+  ],
+  // Landmarks for "matching" questions — is your nearest ___ the same as ours?
+  // Borough anchors are centroids; nearest-anchor ≈ which borough you're in.
+  pois: [
+    { id: 'MAN', category: 'borough', name: 'Manhattan',     lat: 40.776, lng: -73.971 },
+    { id: 'BKN', category: 'borough', name: 'Brooklyn',      lat: 40.650, lng: -73.950 },
+    { id: 'QNS', category: 'borough', name: 'Queens',        lat: 40.728, lng: -73.794 },
+    { id: 'BRX', category: 'borough', name: 'The Bronx',     lat: 40.844, lng: -73.864 },
+    { id: 'STAT', category: 'borough', name: 'Staten Island', lat: 40.580, lng: -74.150 },
+    { id: 'JFK',  category: 'airport',   name: 'JFK',                  lat: 40.6413, lng: -73.7781 },
+    { id: 'LGA',  category: 'airport',   name: 'LaGuardia',            lat: 40.7769, lng: -73.8740 },
+    { id: 'EWR',  category: 'airport',   name: 'Newark',               lat: 40.6895, lng: -74.1745 },
+    { id: 'BXZOO',category: 'zoo',       name: 'Bronx Zoo',            lat: 40.8506, lng: -73.8769 },
+    { id: 'CPZOO',category: 'zoo',       name: 'Central Park Zoo',     lat: 40.7678, lng: -73.9718 },
+    { id: 'PPZOO',category: 'zoo',       name: 'Prospect Park Zoo',    lat: 40.6644, lng: -73.9686 },
+    { id: 'QZOO', category: 'zoo',       name: 'Queens Zoo',           lat: 40.7434, lng: -73.8513 },
+    { id: 'LUNA', category: 'amusement', name: 'Luna Park (Coney Is.)',lat: 40.5745, lng: -73.9790 },
+    { id: 'ADVL', category: 'amusement', name: 'Adventureland',        lat: 40.7385, lng: -73.4179 },
+    { id: 'GADV', category: 'amusement', name: 'Six Flags Great Adv.', lat: 40.1372, lng: -74.4413 },
+  ],
+};

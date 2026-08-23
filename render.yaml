@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: transit-hideseek
+    runtime: node
+    plan: free
+    buildCommand: npm run build
+    startCommand: npm start
+    envVars:
+      # values are set in the Render dashboard, never stored in the repo
+      - key: GOOGLE_MAPS_KEY          # server: Street View Static API (Phantom photos)
+        sync: false
+      - key: GOOGLE_MAPS_BROWSER_KEY  # browser: Maps Embed API (in-app Street View)
+        sync: false

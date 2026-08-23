@@ -550,11 +550,12 @@ a { color: var(--amber); }
 .app-icon { position: relative; display: flex; flex-direction: column; align-items: center; gap: 8px; background: none; border: none; cursor: pointer; }
 .ai-glyph { width: 66px; height: 66px; border-radius: 18px; display: grid; place-items: center; font-size: 32px;
   box-shadow: 0 6px 16px rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.08); }
-.ai-glyph.bus { background: linear-gradient(160deg, #2b6cf0, #1741a8); }
-.ai-glyph.maps { background: linear-gradient(160deg, #2fb56a, #146b3c); }
-.ai-glyph.texts { background: linear-gradient(160deg, #35c759, #1c7d38); }
-.ai-name { font-family: var(--mono); font-size: 11px; color: var(--bone); letter-spacing: 0.02em; }
-.app-icon:hover .ai-glyph { transform: translateY(-2px); }
+.ai-glyph.bus, .ai-glyph.maps, .ai-glyph.texts {
+  background: linear-gradient(160deg, #17140b, #0b0d11);
+  border: 1px solid rgba(255, 176, 0, 0.6); box-shadow: 0 6px 16px rgba(0,0,0,0.5), inset 0 0 14px rgba(255,176,0,0.12);
+}
+.ai-name { font-family: var(--mono); font-size: 11px; color: #ffce5c; letter-spacing: 0.02em; }
+.app-icon:hover .ai-glyph { transform: translateY(-2px); background: linear-gradient(160deg, #ffb000, #b87f08); border-color: #ffb000; }
 .ai-badge { position: absolute; top: -6px; right: 8px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px;
   background: #ff3b30; color: #fff; font-family: var(--mono); font-size: 11px; font-weight: 700; display: grid; place-items: center; }
 .home-hint { margin-top: auto; font-family: var(--mono); font-size: 11px; color: var(--muted); line-height: 1.5; }

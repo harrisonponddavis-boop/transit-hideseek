@@ -113,6 +113,7 @@ function createGame(hostId, hostName, cityId = DEFAULT_CITY) {
     seekerStation: city.startStation,
     winRadius: RULES.WIN_RADIUS_METERS, // host-configurable in the lobby
     walkPos: null, // { lat, lng } when seekers have walked away from their station
+    aboard: null, // { lineId, fromStation, wait } while riding a specific line
     thermoStart: null, // { lat, lng, label } once a thermometer reading is started
     stationConfirmed: false, // a Right Station YES unlocks in-app Street View
     clock: 0, // game minutes elapsed
@@ -290,6 +291,75 @@ function busWait(game, toStationId) {
     h = Math.imul(h, 16777619);
   }
   return 1 + ((h >>> 0) % RULES.MAX_BUS_WAIT_MINS); // 1..MAX
+}
+
+// Which lines stop at a station, and the next-arrival wait for each. The wait
+// is deterministic from station+line+clock, so it's stable while you decide and
+// refreshes as the clock advances (like a real arrivals board).
+function linesAt(city, stationId) {
+  return city.lines.filter((l) => l.stops.includes(stationId));
+}
+function lineWait(game, lineId) {
+  const seed = `L|${game.seekerStation}|${lineId}|${game.clock}`;
+  let h = 2166136261;
+  for (let i = 0; i < seed.length; i++) { h ^= seed.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return 1 + ((h >>> 0) % RULES.MAX_BUS_WAIT_MINS);
+}
+// Minutes to ride one line between two of its stops (sum of the hops between).
+function alongLineMins(line, fromId, toId) {
+  const a = line.stops.indexOf(fromId), b = line.stops.indexOf(toId);
+  if (a < 0 || b < 0) return null;
+  const lo = Math.min(a, b), hi = Math.max(a, b);
+  let m = 0;
+  for (let i = lo; i < hi; i++) m += line.hops[i];
+  return m;
+}
+
+// Board a specific line at the current station: wait for it to arrive, then
+// you're "on" the vehicle until you tell the driver your stop (disembark).
+function board(game, lineId) {
+  if (game.aboard) return { error: 'You are already on a vehicle' };
+  const city = cityOf(game);
+  const line = city.lines.find((l) => l.id === lineId);
+  if (!line) return { error: 'Unknown line' };
+  if (!line.stops.includes(game.seekerStation)) return { error: 'That line does not stop here' };
+  const wait = lineWait(game, lineId);
+  const walkBack = game.walkPos ? walkMinutes(game.walkPos, city.stations[game.seekerStation]) : 0;
+  game.clock += wait + walkBack;
+  game.walkPos = null;
+  game.aboard = { lineId, fromStation: game.seekerStation, wait };
+  const noun = city.vehicle === 'bus' ? 'bus' : 'train';
+  game.feed.push({
+    kind: 'system', clock: game.clock,
+    text: `Waited ${wait} min at ${city.stations[game.seekerStation].name} and boarded the ${line.name} ${noun}.`,
+  });
+  return { ok: true };
+}
+
+// Tell the driver your stop: ride the boarded line there and get off.
+function disembark(game, toStationId) {
+  if (!game.aboard) return { error: 'You are not on a vehicle' };
+  const city = cityOf(game);
+  const line = city.lines.find((l) => l.id === game.aboard.lineId);
+  if (!line) { game.aboard = null; return { error: 'Your line vanished' }; }
+  if (!line.stops.includes(toStationId)) return { error: 'That stop is not on this line' };
+  const from = game.aboard.fromStation;
+  if (toStationId === from) { // got off where you boarded — just step back onto the platform
+    game.aboard = null;
+    game.feed.push({ kind: 'system', clock: game.clock, text: `Stepped back off at ${city.stations[from].name}.` });
+    return { ok: true };
+  }
+  const rideMins = alongLineMins(line, from, toStationId);
+  const earned = rideCoins(rideMins);
+  game.clock += rideMins;
+  game.coins += earned;
+  game.seekerStation = toStationId;
+  game.aboard = null;
+  game.feed.push({
+    kind: 'move', clock: game.clock, from, to: toStationId, mins: rideMins,
+    text: `Rode the ${line.name} to ${city.stations[toStationId].name} (${rideMins} min, +${earned} coins).`,
+  });
+  return { ok: true };
 }
 
 function move(game, toStationId) {
@@ -498,6 +568,7 @@ function viewFor(game, playerId) {
     seekerStation: game.seekerStation,
     walkPos: game.walkPos,
     seekerPos: seekerPos(game),
+    aboard: game.aboard,
     thermoStart: game.thermoStart,
     stationConfirmed: game.stationConfirmed || false,
     clock: game.clock,
@@ -519,8 +590,10 @@ function viewFor(game, playerId) {
     const t = city.travelTimes(game.seekerStation);
     const wb = game.walkPos ? walkMinutes(game.walkPos, city.stations[game.seekerStation]) : 0;
     base.travelTimes = Object.fromEntries(Object.entries(t).map(([k, v]) => [k, v + wb]));
-    // next-bus wait for each destination, shown in the Bus Schedule app
+    // next-bus wait for each destination, shown in the classic Bus Schedule
     base.busWaits = Object.fromEntries(Object.keys(t).map((k) => [k, busWait(game, k)]));
+    // arrivals board: the lines that stop here and when each next arrives
+    base.lineWaits = Object.fromEntries(linesAt(city, game.seekerStation).map((l) => [l.id, lineWait(game, l.id)]));
   }
   return base;
 }
@@ -528,5 +601,6 @@ function viewFor(game, playerId) {
 module.exports = {
   RULES, QUESTION_DEFS, PHOTO_KINDS, SOLO, MATCH_CATEGORIES, matchCategoriesFor,
   createGame, setOptions, setHider, move, walk, ask, guess, photoReply, viewFor,
+  board, disembark, linesAt, alongLineMins,
   createSoloGame, placeSoloHider, soloPhoto, pickSoloSpot,
 };

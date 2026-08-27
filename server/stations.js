@@ -10,6 +10,9 @@ const CITY_DEFS = [
 ];
 const DEFAULT_CITY = 'sf';
 
+// What you ride inside each city (drives the "inside the vehicle" screen)
+const VEHICLES = { sf: 'bus', chicago: 'train', nyc: 'train', tokyo: 'train' };
+
 const TRANSFER_PENALTY = 0; // kept simple
 
 function buildCity(def) {
@@ -53,6 +56,7 @@ function buildCity(def) {
     name: def.name,
     center: def.center,
     zoom: def.zoom,
+    vehicle: def.vehicle || VEHICLES[def.id] || 'train',
     startStation: def.startStation,
     stations: def.stations,
     lines: def.lines,

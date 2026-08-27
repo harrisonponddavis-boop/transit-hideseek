@@ -1,7 +1,8 @@
 // Simulates a full game against the rules engine, then a socket round-trip.
 const assert = require('assert');
 const { STATIONS, travelTimes, haversineMeters, getCity, listCities } = require('./stations');
-const { createGame, setOptions, setHider, move, walk, ask, guess, photoReply, viewFor, RULES } = require('./game');
+const { createGame, setOptions, setHider, move, walk, ask, guess, photoReply, viewFor, RULES,
+  board, disembark, linesAt, alongLineMins } = require('./game');
 
 // --- Every city must be a single connected graph ---
 const cityList = listCities();
@@ -64,6 +65,33 @@ console.log('✓ borough/district region matching: same-region compare + region 
   before = cg.coins; move(cg, 'OB'); const longGain = cg.coins - before;        // long cross-town ride
   assert(longGain > shortGain, `long ride should pay more (short ${shortGain} vs long ${longGain})`);
   console.log(`✓ ride coins scale with trip length: short hop +${shortGain}, long ride +${longGain}`);
+}
+
+// --- Board a line at a stop, ride it, and get off ---
+{
+  const bg = createGame('BX', 'x');
+  bg.players.push({ id: 'bs', name: 's', role: 'seeker' });
+  bg.phase = 'hiding';
+  assert(setHider(bg, 'BX', 'OB', STATIONS.OB.lat + 0.001, STATIONS.OB.lng).ok);
+  // seekers start at EMB; the MKT (Market St) line stops there
+  const embLines = linesAt(getCity('sf'), 'EMB').map((l) => l.id);
+  assert(embLines.includes('MKT') && embLines.includes('BART'), 'EMB served by MKT + BART');
+  assert(disembark(bg, 'CIVC').error, 'cannot get off before boarding');
+  assert(board(bg, 'N').error, 'N Judah does not stop at EMB');
+  const clockBefore = bg.clock, coinsBefore = bg.coins;
+  assert(board(bg, 'MKT').ok, 'board the Market St line');
+  assert(bg.aboard && bg.aboard.lineId === 'MKT' && bg.aboard.fromStation === 'EMB');
+  assert(bg.clock > clockBefore, 'waiting for the vehicle costs time');
+  assert(board(bg, 'BART').error, 'cannot board twice');
+  // getting off at a stop not on the MKT line is rejected
+  assert(disembark(bg, 'OB').error, 'OB is not on the MKT line');
+  const mktRide = alongLineMins(getCity('sf').lines.find((l) => l.id === 'MKT'), 'EMB', 'CAS');
+  assert(disembark(bg, 'CAS').ok, 'get off at Castro');
+  assert.strictEqual(bg.seekerStation, 'CAS', 'now standing at Castro');
+  assert.strictEqual(bg.aboard, null, 'no longer aboard');
+  assert(bg.coins - coinsBefore >= RULES.MIN_RIDE_COINS, 'riding earns coins');
+  assert(bg.clock >= clockBefore + mktRide, 'ride time was added');
+  console.log(`✓ board→ride→disembark: waited then rode MKT EMB→Castro (${mktRide} min ride)`);
 }
 
 // --- Rules engine simulation ---

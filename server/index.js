@@ -6,6 +6,7 @@ const { Server } = require('socket.io');
 const { getCity, listCities } = require('./stations');
 const {
   createGame, setOptions, setHider, move, walk, ask, guess, photoReply, viewFor, PHOTO_KINDS,
+  board, disembark,
   createSoloGame, placeSoloHider, soloPhoto, matchCategoriesFor,
 } = require('./game');
 
@@ -33,7 +34,7 @@ app.get('/cities', (_req, res) => res.json(listCities()));
 app.get('/network/:cityId', (req, res) => {
   const c = getCity(req.params.cityId);
   res.json({
-    id: c.id, name: c.name, center: c.center, zoom: c.zoom,
+    id: c.id, name: c.name, center: c.center, zoom: c.zoom, vehicle: c.vehicle,
     startStation: c.startStation, stations: c.stations, lines: c.lines,
     pois: c.pois, matchCategories: matchCategoriesFor(c),
     photoKinds: PHOTO_KINDS,
@@ -167,6 +168,28 @@ io.on('connection', (socket) => {
     const me = g.players.find((p) => p.id === playerId);
     if (me?.role !== 'seeker') return cb?.({ error: 'Only seekers can move' });
     const r = move(g, stationId);
+    cb?.(r);
+    if (r.ok) broadcast(g);
+  });
+
+  socket.on('board', ({ lineId }, cb) => {
+    const g = game();
+    if (!g) return cb?.(GONE);
+    if (g.phase !== 'seeking') return cb?.({ error: 'The game is not in the seeking phase' });
+    const me = g.players.find((p) => p.id === playerId);
+    if (me?.role !== 'seeker') return cb?.({ error: 'Only seekers can board' });
+    const r = board(g, lineId);
+    cb?.(r);
+    if (r.ok) broadcast(g);
+  });
+
+  socket.on('disembark', ({ stationId }, cb) => {
+    const g = game();
+    if (!g) return cb?.(GONE);
+    if (g.phase !== 'seeking') return cb?.({ error: 'The game is not in the seeking phase' });
+    const me = g.players.find((p) => p.id === playerId);
+    if (me?.role !== 'seeker') return cb?.({ error: 'Only seekers can get off' });
+    const r = disembark(g, stationId);
     cb?.(r);
     if (r.ok) broadcast(g);
   });

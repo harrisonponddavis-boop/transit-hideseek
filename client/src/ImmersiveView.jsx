@@ -1,17 +1,22 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { loadGoogleMaps } from './maps-loader';
-import { isPointPossible, possibleStations, geoConstraints } from './solver';
+import { isPointPossible, possibleStations, geoConstraints, metersBetween, bearingBetween } from './solver';
 import MapView from './MapView';
+import MiniMap from './MiniMap';
 
 const RADARS = [{ km: 0.5, c: 5 }, { km: 1, c: 4 }, { km: 2, c: 3 }, { km: 5, c: 2 }];
+const BOARD_RADIUS = 35;   // metres you must be within to board (~100 ft)
+const WALK_RADIUS = 250;   // how far you can walk from your station on the map
 
 // The seeker's main screen: you stand at a real station in Street View and do
 // everything through your phone — catch a line at the stop, plan on the Maps
-// app, and text the hider questions. Real panorama when a Maps key is present;
-// a stylised fallback (still fully playable) otherwise.
+// app, and text the hider questions. Once you confirm the hider's station it
+// flips to an endgame view with the hider's photo and map beside the panorama.
 export default function ImmersiveView({ state, network, act, embedKey, onExit }) {
   const elRef = useRef(null);
   const panoRef = useRef(null);
+  const svcRef = useRef(null);
+  const stopPosRef = useRef(null); // where the stop is (first pano position on arrival)
   const [heading, setHeading] = useState(0);
   const [pos, setPos] = useState(state.seekerPos);
   const [live, setLive] = useState(false);
@@ -19,26 +24,26 @@ export default function ImmersiveView({ state, network, act, embedKey, onExit })
 
   const [phoneOpen, setPhoneOpen] = useState(false);
   const [app, setApp] = useState('home'); // 'home' | 'bus' | 'maps' | 'texts'
-  const [phoneTheme, setPhoneTheme] = useState('dark');
-  const [seenTexts, setSeenTexts] = useState(0);
-  const [atStop, setAtStop] = useState(false); // have you walked to the boarding point?
+  const [phoneTheme, setPhoneTheme] = useState(() => {
+    try { return localStorage.getItem('ths-phone-theme') || 'dark'; } catch { return 'dark'; }
+  });
+  const [lightbox, setLightbox] = useState(null);
 
   const seekerStation = state.seekerStation;
   const aboard = state.aboard;
   const vehicle = network?.vehicle || 'train';
-  const stopWord = vehicle === 'bus' ? 'bus stop' : 'platform';
+  const confirmed = !!state.stationConfirmed;
 
   const actRef = useRef(act); actRef.current = act;
-  const svcRef = useRef(null);
 
-  // station coords are approximate, so snap to the nearest real panorama
+  useEffect(() => {
+    try { localStorage.setItem('ths-phone-theme', phoneTheme); } catch { /* ignore */ }
+  }, [phoneTheme]);
+
   const goToPano = (loc) => {
     const pano = panoRef.current, svc = svcRef.current;
     if (!pano) return;
     if (!svc) { pano.setPosition({ lat: loc.lat, lng: loc.lng }); return; }
-    // OUTDOOR (the enum, not the string) filters out non-renderable photospheres
-    // that sometimes sit on a station's approximate coordinates; setPano forces
-    // that exact road panorama rather than re-snapping to the nearest photosphere.
     const source = window.google?.maps?.StreetViewSource?.OUTDOOR;
     svc.getPanorama({ location: { lat: loc.lat, lng: loc.lng }, radius: 240, ...(source ? { source } : {}) }, (data, status) => {
       if (status === 'OK' && data?.location?.pano) pano.setPano(data.location.pano);
@@ -61,20 +66,26 @@ export default function ImmersiveView({ state, network, act, embedKey, onExit })
       pano.addListener('pov_changed', () => setHeading(pano.getPov().heading));
       pano.addListener('position_changed', () => {
         const p = pano.getPosition();
-        if (p) setPos({ lat: p.lat(), lng: p.lng() });
+        if (!p) return;
+        const np = { lat: p.lat(), lng: p.lng() };
+        setPos(np);
+        if (!stopPosRef.current) stopPosRef.current = np; // first fix at a station = the stop
       });
       goToPano(state.seekerPos);
     }).catch(() => {});
     return () => { cancelled = true; };
   }, [embedKey]);
 
+  // a NEW station means a new stop — forget the old one so the next pano fix
+  // (the spawn point) becomes the stop. Walking doesn't change the station, so
+  // the stop stays put and the return-compass keeps pointing back to it.
+  useEffect(() => { stopPosRef.current = null; }, [seekerStation]);
+
+  // follow the seeker's position (a ride or a walk) by recentring the panorama
   useEffect(() => {
     setPos(state.seekerPos);
     goToPano(state.seekerPos);
   }, [state.seekerPos.lat, state.seekerPos.lng]);
-
-  // reaching a new station means you have to walk to its stop again
-  useEffect(() => { setAtStop(false); }, [seekerStation]);
 
   const onDown = (e) => { if (!live) dragRef.current = { x: e.clientX, h: heading }; };
   const onMove = (e) => {
@@ -83,19 +94,17 @@ export default function ImmersiveView({ state, network, act, embedKey, onExit })
   };
   const onUp = () => { dragRef.current = null; };
 
+  const stopPos = stopPosRef.current;
+  const distFromStop = stopPos ? metersBetween(pos, stopPos) : 0;
+  const nearStop = !stopPos || distFromStop <= BOARD_RADIUS;
+
   const hasIntel = state.feed.some((f) => f.kind === 'question' && f.answer);
   const ruledOut = hasIntel && network && !isPointPossible(network, state.feed, state.rules.HIDE_ZONE_METERS, pos);
 
-  const questionCount = state.feed.filter((f) => f.kind === 'question').length;
-  const unread = Math.max(0, questionCount - seenTexts);
-  useEffect(() => {
-    if (phoneOpen && app === 'texts') setSeenTexts(questionCount);
-  }, [phoneOpen, app, questionCount]);
-
-  const openApp = (which) => { setPhoneOpen(true); setApp(which); if (which === 'texts') setSeenTexts(questionCount); };
+  const openApp = (which) => { setPhoneOpen(true); setApp(which); };
   const goHome = () => setApp('home');
   const closePhone = () => setPhoneOpen(false);
-  const goToStop = () => { setAtStop(true); setPhoneOpen(true); setApp('bus'); };
+  const returnToStop = () => stopPos && goToPano(stopPos);
 
   const dropPin = async () => {
     const r = await act('walk', pos);
@@ -105,6 +114,7 @@ export default function ImmersiveView({ state, network, act, embedKey, onExit })
 
   const hider = state.players?.find((p) => p.role === 'hider');
   const hiderName = hider?.name || 'The Hider';
+  const latestPhoto = [...state.feed].reverse().find((f) => f.img)?.img || null;
 
   return (
     <div className="imm" onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerLeave={onUp}>
@@ -127,37 +137,40 @@ export default function ImmersiveView({ state, network, act, embedKey, onExit })
         <span className="ih-city">{network?.name}</span>
       </div>
 
-      {ruledOut && !aboard && <div className="imm-warning">⚠ Your answers have ruled out this spot</div>}
-
-      {/* on a vehicle: a fullscreen interior where you tell the driver your stop */}
       {aboard && <OnboardView state={state} network={network} act={actRef.current} />}
 
-      {!aboard && (
+      {/* ENDGAME: right station confirmed — hunt in Street View with photo + map */}
+      {!aboard && confirmed && (
+        <EndgameView state={state} network={network} pos={pos} latestPhoto={latestPhoto}
+          theme={phoneTheme} onWalk={walkHere} onDropPin={dropPin} onPhoto={() => latestPhoto && setLightbox(latestPhoto)} />
+      )}
+
+      {!aboard && !confirmed && (
         <>
+          {ruledOut && <div className="imm-warning">⚠ Your answers have ruled out this spot</div>}
+
+          {/* wayfinding back to the stop once you wander off */}
+          {stopPos && !nearStop && (
+            <button className="stop-compass" onClick={returnToStop} title="Return to the stop">
+              <span className="sc-arrow" style={{ transform: `rotate(${norm(bearingBetween(pos, stopPos) - heading)}deg)` }}>▲</span>
+              <span className="sc-text">{vehicle === 'bus' ? 'Bus stop' : 'Station'}<i>{Math.round(distFromStop)}m · tap to return</i></span>
+            </button>
+          )}
+
           <div className="imm-sv-controls">
             <button className="sv-btn ghost" onClick={walkHere} title="Move your standing point to here">Walk here</button>
             <button className="sv-btn" onClick={dropPin} title="Walk here and tag the hider">📍 Drop pin</button>
           </div>
 
-          {/* highlighted boarding point to walk to */}
-          {!atStop && !phoneOpen && (
-            <button className="stop-marker" onClick={goToStop}>
-              <span className="sm-ring" />
-              <span className="sm-icon">{vehicle === 'bus' ? '🚏' : '🚉'}</span>
-              <span className="sm-label">Walk to the {stopWord}</span>
-            </button>
-          )}
-
           {!phoneOpen && (
             <button className="phone-launch" onClick={() => openApp('home')} title="Open your phone">
               <span className="pl-icon">📱</span>
               <span className="pl-label">Phone</span>
-              {unread > 0 && <span className="pl-badge">{unread}</span>}
             </button>
           )}
 
           {phoneOpen && app === 'maps' && (
-            <MapsApp network={network} state={state} theme={phoneTheme} onBack={goHome} />
+            <MapsApp network={network} state={state} theme={phoneTheme} act={actRef.current} onBack={goHome} />
           )}
 
           {phoneOpen && app !== 'maps' && (
@@ -174,10 +187,11 @@ export default function ImmersiveView({ state, network, act, embedKey, onExit })
                   </span>
                 </div>
                 <div className="phone-screen">
-                  {app === 'home' && <PhoneHome unread={unread} vehicle={vehicle} onOpen={openApp} />}
+                  {app === 'home' && <PhoneHome vehicle={vehicle} onOpen={openApp} />}
                   {app === 'bus' && <BusApp state={state} network={network} act={actRef.current}
-                    atStop={atStop} onGoToStop={() => setAtStop(true)} onBoarded={closePhone} />}
-                  {app === 'texts' && <TextsApp state={state} network={network} act={actRef.current} hiderName={hiderName} />}
+                    nearStop={nearStop} distFromStop={distFromStop} onReturn={() => { returnToStop(); }} onBoarded={closePhone} />}
+                  {app === 'texts' && <TextsApp state={state} network={network} act={actRef.current}
+                    hiderName={hiderName} onOpenPhoto={(img) => setLightbox(img)} />}
                 </div>
                 <button className="phone-homebar" onClick={goHome} title="Home"><span className="hb" /></button>
               </div>
@@ -185,11 +199,18 @@ export default function ImmersiveView({ state, network, act, embedKey, onExit })
           )}
         </>
       )}
+
+      {lightbox && (
+        <div className="imm-lightbox" onClick={() => setLightbox(null)}>
+          <img src={lightbox} alt="hider photo" onClick={(e) => e.stopPropagation()} />
+          <button className="imm-lightbox-close" onClick={() => setLightbox(null)}>Close ✕</button>
+        </div>
+      )}
     </div>
   );
 }
 
-function PhoneHome({ unread, vehicle, onOpen }) {
+function PhoneHome({ vehicle, onOpen }) {
   const transitLabel = vehicle === 'bus' ? 'Bus' : 'Train';
   return (
     <div className="home-screen">
@@ -206,7 +227,6 @@ function PhoneHome({ unread, vehicle, onOpen }) {
         <button className="app-icon" onClick={() => onOpen('texts')}>
           <span className="ai-glyph texts">💬</span>
           <span className="ai-name">Texts</span>
-          {unread > 0 && <span className="ai-badge">{unread}</span>}
         </button>
       </div>
       <p className="home-hint">Catch a {vehicle} at the stop, plan on the map, text the hider.</p>
@@ -214,7 +234,7 @@ function PhoneHome({ unread, vehicle, onOpen }) {
   );
 }
 
-function BusApp({ state, network, act, atStop, onGoToStop, onBoarded }) {
+function BusApp({ state, network, act, nearStop, distFromStop, onReturn, onBoarded }) {
   const here = state.seekerStation;
   const vehicle = network.vehicle || 'train';
   const noun = vehicle === 'bus' ? 'bus' : 'train';
@@ -231,14 +251,14 @@ function BusApp({ state, network, act, atStop, onGoToStop, onBoarded }) {
     if (!r?.error) onBoarded();
   };
 
-  if (!atStop) {
+  if (!nearStop) {
     return (
       <div className="app-view bus-app">
         <div className="app-bar"><span className="ab-title">{vehicle === 'bus' ? '🚌' : '🚆'} Transit</span></div>
         <div className="board-gate">
           <div className="bg-icon">{vehicle === 'bus' ? '🚏' : '🚉'}</div>
-          <p className="bg-text">You're at <b>{network.stations[here]?.name}</b>.<br />Walk over to the {stopWord} to see which {noun}s stop here.</p>
-          <button className="primary-btn" onClick={onGoToStop}>Walk to the {stopWord}</button>
+          <p className="bg-text">You've wandered <b>{Math.round(distFromStop)}m</b> from the {stopWord}.<br />Get back within {BOARD_RADIUS}m to catch a {noun}.</p>
+          <button className="primary-btn" onClick={onReturn}>Walk back to the {stopWord}</button>
         </div>
       </div>
     );
@@ -304,7 +324,7 @@ function OnboardView({ state, network, act }) {
   );
 }
 
-function TextsApp({ state, network, act, hiderName }) {
+function TextsApp({ state, network, act, hiderName, onOpenPhoto }) {
   const threadRef = useRef(null);
   const [sending, setSending] = useState(false);
 
@@ -335,7 +355,7 @@ function TextsApp({ state, network, act, hiderName }) {
               <div className="txt-pair" key={i}>
                 <div className="txt-bubble sent">{f.label}</div>
                 <div className="txt-bubble recv">
-                  {f.img && <img className="txt-img" src={f.img} alt={f.label} />}
+                  {f.img && <img className="txt-img" src={f.img} alt="hider photo" onClick={() => onOpenPhoto(f.img)} />}
                   <span>{answer}</span>
                 </div>
               </div>
@@ -365,8 +385,10 @@ function TextsApp({ state, network, act, hiderName }) {
   );
 }
 
-function MapsApp({ network, state, theme, onBack }) {
+function MapsApp({ network, state, theme, act, onBack }) {
   const [sel, setSel] = useState(null);
+  const [pendingWalk, setPendingWalk] = useState(null);
+  const [walkMsg, setWalkMsg] = useState(null);
   const guesses = state.feed.filter((f) => f.kind === 'guess' && f.lat);
   const radarHistory = state.feed
     .filter((f) => f.type === 'radar' && f.center)
@@ -383,6 +405,15 @@ function MapsApp({ network, state, theme, onBack }) {
   const active = tools.find((t) => t.key === sel);
   const toggle = (key) => setSel((cur) => (cur === key ? null : key));
 
+  const here = state.seekerPos;
+  const onMapClick = (lat, lng) => {
+    const d = metersBetween({ lat, lng }, here);
+    if (d > WALK_RADIUS) { setWalkMsg(`That's ${Math.round(d)}m — you can only walk ${WALK_RADIUS}m from here.`); setPendingWalk(null); return; }
+    setWalkMsg(null);
+    setPendingWalk({ lat, lng, mins: Math.max(1, Math.ceil((d / 1000) * state.rules.WALK_PACE_MIN_PER_KM)), meters: Math.round(d) });
+  };
+  const doWalk = async () => { const p = pendingWalk; setPendingWalk(null); await act('walk', { lat: p.lat, lng: p.lng }); };
+
   return (
     <div className="maps-fullscreen">
       <MapView
@@ -390,26 +421,82 @@ function MapsApp({ network, state, theme, onBack }) {
         network={network}
         theme={theme === 'light' ? 'light' : 'dark'}
         seekerStation={state.seekerStation}
-        seekerPos={state.seekerPos}
+        seekerPos={here}
         radarHistory={radarHistory}
         possibleZones={possibleZones}
         travelTimes={state.travelTimes}
         guesses={guesses}
         preview={active?.pv || null}
-        clickMode={null}
+        guessRange={{ lat: here.lat, lng: here.lng, radius: WALK_RADIUS }}
+        pin={pendingWalk}
+        clickMode="point"
+        onMapClick={onMapClick}
       />
       <div className="maps-topbar">
         <button className="maps-back" onClick={onBack}>‹ Back to phone</button>
         <span className="maps-hint">
-          {active ? active.hint : 'Tap a question below to preview how it splits the map. Shaded areas are already ruled out.'}
+          {walkMsg || (active ? active.hint : 'Tap inside the ring to walk there; tap a question below to preview how it splits the map.')}
         </span>
       </div>
+      <MapLegend lines={network?.lines || []} />
+      {pendingWalk && (
+        <div className="maps-walkbar">
+          <span>Walk <b>{pendingWalk.meters}m</b> here · ~{pendingWalk.mins} min</span>
+          <button className="mw-cancel" onClick={() => setPendingWalk(null)}>Cancel</button>
+          <button className="mw-go" onClick={doWalk}>Walk here</button>
+        </div>
+      )}
       <div className="map-tools">
         {tools.map((t) => (
           <button key={t.key} className={`map-tool ${sel === t.key ? 'on' : ''}`} onClick={() => toggle(t.key)}>
             {t.label}
           </button>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function MapLegend({ lines }) {
+  const [open, setOpen] = useState(true);
+  if (!lines.length) return null;
+  return (
+    <div className={`map-legend ${open ? 'open' : ''}`}>
+      <button className="ml-toggle" onClick={() => setOpen((v) => !v)}>{open ? 'Lines ▾' : 'Lines ▸'}</button>
+      {open && (
+        <div className="ml-list">
+          {lines.map((l) => (
+            <div className="ml-row" key={l.id}>
+              <span className="ml-swatch" style={{ background: l.color }} />
+              <span className="ml-name">{l.name}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EndgameView({ state, network, pos, latestPhoto, theme, onWalk, onDropPin, onPhoto }) {
+  return (
+    <div className="endgame">
+      <div className="eg-banner">🎯 Right station! Walk the street (click the arrows) to find the exact spot, then drop your pin.</div>
+      <aside className="eg-side">
+        {latestPhoto && (
+          <div className="eg-photo" onClick={onPhoto} title="Tap to enlarge">
+            <div className="eg-panel-label">Hider's photo — tap to enlarge</div>
+            <img src={latestPhoto} alt="hider photo" />
+          </div>
+        )}
+        <div className="eg-map">
+          <div className="eg-panel-label">Where the hider can still be</div>
+          <MiniMap network={network} feed={state.feed} zoneR={state.rules.HIDE_ZONE_METERS}
+            seekerPos={pos} theme={theme === 'light' ? 'light' : 'dark'} />
+        </div>
+      </aside>
+      <div className="eg-controls">
+        <button className="sv-btn ghost" onClick={onWalk}>Walk here</button>
+        <button className="sv-btn eg-drop" onClick={onDropPin}>📍 Drop pin & tag</button>
       </div>
     </div>
   );
@@ -443,6 +530,8 @@ function alongLine(line, fromId, toId) {
   for (let i = lo; i < hi; i++) m += line.hops[i];
   return m;
 }
+
+const norm = (a) => (((a % 360) + 540) % 360) - 180;
 
 // Black or white text, whichever is readable on a line's colour.
 function readableOn(hex) {

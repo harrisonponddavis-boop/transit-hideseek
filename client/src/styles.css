@@ -721,3 +721,56 @@ a { color: var(--amber); }
 /* ---- flatter, less "glowy" accents ---- */
 .phone-launch { background: #14171f; }
 .map-tool.on { box-shadow: none; }
+
+/* ---- return-to-stop wayfinder ---- */
+.stop-compass { position: absolute; left: 50%; top: 96px; transform: translateX(-50%); z-index: 34;
+  display: flex; align-items: center; gap: 10px; cursor: pointer;
+  background: #101319; border: 1px solid rgba(255,255,255,0.14); border-radius: 10px; padding: 8px 14px;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.55); }
+.stop-compass:hover { border-color: #ffd23f; }
+.sc-arrow { font-size: 20px; color: #ffd23f; display: inline-block; transition: transform 0.15s; }
+.sc-text { display: flex; flex-direction: column; font-family: var(--display); font-size: 15px; color: #fff; letter-spacing: 0.03em; }
+.sc-text i { font-family: var(--mono); font-size: 10px; font-style: normal; color: #ffd23f; letter-spacing: 0; }
+
+/* ---- map legend ---- */
+.map-legend { position: absolute; top: 58px; right: 14px; z-index: 1300; background: rgba(10,12,17,0.92);
+  border: 1px solid #2a3140; border-radius: 10px; overflow: hidden; max-width: 220px; }
+.ml-toggle { width: 100%; font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
+  color: #ffd23f; background: none; border: none; padding: 8px 12px; text-align: left; cursor: pointer; }
+.ml-list { padding: 2px 12px 10px; display: flex; flex-direction: column; gap: 6px; max-height: 40vh; overflow-y: auto; }
+.ml-row { display: flex; align-items: center; gap: 8px; }
+.ml-swatch { width: 22px; height: 5px; border-radius: 3px; flex: none; }
+.ml-name { font-family: var(--mono); font-size: 11px; color: #dfe3ea; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ---- walk-on-map bar ---- */
+.maps-walkbar { position: absolute; left: 50%; bottom: 74px; transform: translateX(-50%); z-index: 1300;
+  display: flex; align-items: center; gap: 12px; background: rgba(10,12,17,0.95); border: 1px solid #2a3140;
+  border-radius: 12px; padding: 10px 14px; font-family: var(--mono); font-size: 13px; color: #dfe3ea; }
+.maps-walkbar b { color: #fff; }
+.mw-cancel { font-family: var(--mono); font-size: 12px; background: transparent; color: #aeb4c0; border: 1px solid #333b4a; border-radius: 8px; padding: 7px 12px; cursor: pointer; }
+.mw-go { font-family: var(--display); font-size: 15px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; background: #ffd23f; color: #0b0d11; border: none; border-radius: 8px; padding: 8px 15px; cursor: pointer; }
+
+/* ---- endgame: hunt in Street View with photo + map ---- */
+.endgame { position: absolute; inset: 0; z-index: 40; pointer-events: none; }
+.eg-banner { pointer-events: auto; position: absolute; top: 92px; left: 50%; transform: translateX(-50%);
+  max-width: 640px; width: max-content; background: #ffd23f; color: #0b0d11; font-family: var(--mono); font-size: 12px;
+  line-height: 1.4; padding: 9px 16px; border-radius: 10px; text-align: center; box-shadow: 0 6px 20px rgba(0,0,0,0.5); }
+.eg-side { pointer-events: auto; position: absolute; top: 150px; right: 16px; bottom: 92px; width: 300px; max-width: 42vw;
+  display: flex; flex-direction: column; gap: 12px; }
+.eg-panel-label { font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: #ffd23f; padding: 8px 10px 6px; }
+.eg-photo { background: rgba(10,12,17,0.92); border: 1px solid #2a3140; border-radius: 12px; overflow: hidden; cursor: zoom-in; flex: none; }
+.eg-photo img { display: block; width: 100%; }
+.eg-map { flex: 1; min-height: 180px; background: rgba(10,12,17,0.92); border: 1px solid #2a3140; border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; }
+.eg-map .mini-map { flex: 1; min-height: 140px; }
+.eg-controls { pointer-events: auto; position: absolute; left: 50%; bottom: 20px; transform: translateX(-50%); display: flex; gap: 12px; }
+.eg-drop { font-size: 14px; }
+
+/* ---- photo lightbox ---- */
+.imm-lightbox { position: absolute; inset: 0; z-index: 200; background: rgba(5,6,9,0.9);
+  display: flex; align-items: center; justify-content: center; cursor: zoom-out; }
+.imm-lightbox img { max-width: 90vw; max-height: 84vh; border: 2px solid #ffd23f; box-shadow: 0 30px 80px rgba(0,0,0,0.7); }
+.imm-lightbox-close { position: absolute; top: 20px; right: 20px; font-family: var(--mono); font-size: 13px; color: #0b0d11;
+  background: #ffd23f; border: none; border-radius: 9px; padding: 9px 15px; cursor: pointer; }
+
+/* light-mode extras */
+.phone.light .maps-walkbar, .phone.light .map-legend { /* maps app is fullscreen, not inside phone; no-op guard */ }

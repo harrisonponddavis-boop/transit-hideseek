@@ -76,7 +76,7 @@ body {
 /* ---- layout ---- */
 .main { flex: 1; display: flex; min-height: 0; }
 .map-wrap { flex: 1; position: relative; }
-#map { position: absolute; inset: 0; background: #0a0c10; }
+.mapview-root { position: absolute; inset: 0; background: #0a0c10; }
 .side {
   width: 380px; display: flex; flex-direction: column;
   border-left: 1px solid var(--edge); background: var(--panel);
@@ -760,8 +760,11 @@ a { color: var(--amber); }
 .eg-panel-label { font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: #ffd23f; padding: 8px 10px 6px; }
 .eg-photo { background: rgba(10,12,17,0.92); border: 1px solid #2a3140; border-radius: 12px; overflow: hidden; cursor: zoom-in; flex: none; }
 .eg-photo img { display: block; width: 100%; }
-.eg-map { flex: 1; min-height: 180px; background: rgba(10,12,17,0.92); border: 1px solid #2a3140; border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; }
-.eg-map .mini-map { flex: 1; min-height: 140px; }
+.eg-map { flex: 1; min-height: 200px; background: rgba(10,12,17,0.92); border: 1px solid #2a3140; border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; }
+.eg-map-inner { flex: 1; position: relative; min-height: 150px; }
+.eg-walkbar { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-top: 1px solid #2a3140;
+  font-family: var(--mono); font-size: 12px; color: #dfe3ea; }
+.eg-walkbar b { color: #fff; }
 .eg-controls { pointer-events: auto; position: absolute; left: 50%; bottom: 20px; transform: translateX(-50%); display: flex; gap: 12px; }
 .eg-drop { font-size: 14px; }
 

@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { loadGoogleMaps } from './maps-loader';
 import { isPointPossible, possibleStations, geoConstraints, metersBetween, bearingBetween } from './solver';
 import MapView from './MapView';
-import MiniMap from './MiniMap';
 
 const RADARS = [{ km: 0.5, c: 5 }, { km: 1, c: 4 }, { km: 2, c: 3 }, { km: 5, c: 2 }];
 const BOARD_RADIUS = 35;   // metres you must be within to board (~100 ft)
@@ -140,27 +139,29 @@ export default function ImmersiveView({ state, network, act, embedKey, onExit })
       {aboard && <OnboardView state={state} network={network} act={actRef.current} />}
 
       {/* ENDGAME: right station confirmed — hunt in Street View with photo + map */}
-      {!aboard && confirmed && (
-        <EndgameView state={state} network={network} pos={pos} latestPhoto={latestPhoto}
-          theme={phoneTheme} onWalk={walkHere} onDropPin={dropPin} onPhoto={() => latestPhoto && setLightbox(latestPhoto)} />
-      )}
-
-      {!aboard && !confirmed && (
+      {!aboard && (
         <>
-          {ruledOut && <div className="imm-warning">⚠ Your answers have ruled out this spot</div>}
+          {confirmed ? (
+            <EndgameView state={state} network={network} act={actRef.current} latestPhoto={latestPhoto}
+              theme={phoneTheme} onDropPin={dropPin} onPhoto={() => latestPhoto && setLightbox(latestPhoto)} />
+          ) : (
+            <>
+              {ruledOut && <div className="imm-warning">⚠ Your answers have ruled out this spot</div>}
 
-          {/* wayfinding back to the stop once you wander off */}
-          {stopPos && !nearStop && (
-            <button className="stop-compass" onClick={returnToStop} title="Return to the stop">
-              <span className="sc-arrow" style={{ transform: `rotate(${norm(bearingBetween(pos, stopPos) - heading)}deg)` }}>▲</span>
-              <span className="sc-text">{vehicle === 'bus' ? 'Bus stop' : 'Station'}<i>{Math.round(distFromStop)}m · tap to return</i></span>
-            </button>
+              {/* wayfinding back to the stop once you wander off */}
+              {stopPos && !nearStop && (
+                <button className="stop-compass" onClick={returnToStop} title="Return to the stop">
+                  <span className="sc-arrow" style={{ transform: `rotate(${norm(bearingBetween(pos, stopPos) - heading)}deg)` }}>▲</span>
+                  <span className="sc-text">{vehicle === 'bus' ? 'Bus stop' : 'Station'}<i>{Math.round(distFromStop)}m · tap to return</i></span>
+                </button>
+              )}
+
+              <div className="imm-sv-controls">
+                <button className="sv-btn ghost" onClick={walkHere} title="Move your standing point to here">Walk here</button>
+                <button className="sv-btn" onClick={dropPin} title="Walk here and tag the hider">📍 Drop pin</button>
+              </div>
+            </>
           )}
-
-          <div className="imm-sv-controls">
-            <button className="sv-btn ghost" onClick={walkHere} title="Move your standing point to here">Walk here</button>
-            <button className="sv-btn" onClick={dropPin} title="Walk here and tag the hider">📍 Drop pin</button>
-          </div>
 
           {!phoneOpen && (
             <button className="phone-launch" onClick={() => openApp('home')} title="Open your phone">
@@ -477,10 +478,31 @@ function MapLegend({ lines }) {
   );
 }
 
-function EndgameView({ state, network, pos, latestPhoto, theme, onWalk, onDropPin, onPhoto }) {
+function EndgameView({ state, network, act, latestPhoto, theme, onDropPin, onPhoto }) {
+  const [pendingWalk, setPendingWalk] = useState(null);
+  const here = state.seekerPos;
+  const guesses = state.feed.filter((f) => f.kind === 'guess' && f.lat);
+  const radarHistory = state.feed
+    .filter((f) => f.type === 'radar' && f.center)
+    .map((f) => ({ center: f.center, radiusKm: f.radiusKm, yes: f.answer.startsWith('YES') }));
+  const possibleZones = useMemo(
+    () => network && {
+      stations: possibleStations(network, state.feed, state.rules.HIDE_ZONE_METERS),
+      radius: state.rules.HIDE_ZONE_METERS,
+      constraints: geoConstraints(state.feed, network),
+    },
+    [network, state.feed.length]
+  );
+  const onMapClick = (lat, lng) => {
+    const d = metersBetween({ lat, lng }, here);
+    if (d > WALK_RADIUS) { setPendingWalk(null); return; }
+    setPendingWalk({ lat, lng, meters: Math.round(d), mins: Math.max(1, Math.ceil((d / 1000) * state.rules.WALK_PACE_MIN_PER_KM)) });
+  };
+  const doWalk = async () => { const p = pendingWalk; setPendingWalk(null); await act('walk', { lat: p.lat, lng: p.lng }); };
+
   return (
     <div className="endgame">
-      <div className="eg-banner">🎯 Right station! Walk the street (click the arrows) to find the exact spot, then drop your pin.</div>
+      <div className="eg-banner">🎯 Right station! Walk the street (or tap the map) to the exact spot, then drop your pin.</div>
       <aside className="eg-side">
         {latestPhoto && (
           <div className="eg-photo" onClick={onPhoto} title="Tap to enlarge">
@@ -489,13 +511,35 @@ function EndgameView({ state, network, pos, latestPhoto, theme, onWalk, onDropPi
           </div>
         )}
         <div className="eg-map">
-          <div className="eg-panel-label">Where the hider can still be</div>
-          <MiniMap network={network} feed={state.feed} zoneR={state.rules.HIDE_ZONE_METERS}
-            seekerPos={pos} theme={theme === 'light' ? 'light' : 'dark'} />
+          <div className="eg-panel-label">Still-possible area — tap in the ring to walk</div>
+          <div className="eg-map-inner">
+            <MapView
+              key={`eg-${network?.id}`}
+              network={network}
+              theme={theme === 'light' ? 'light' : 'dark'}
+              seekerStation={state.seekerStation}
+              seekerPos={here}
+              radarHistory={radarHistory}
+              possibleZones={possibleZones}
+              travelTimes={state.travelTimes}
+              guesses={guesses}
+              guessRange={{ lat: here.lat, lng: here.lng, radius: WALK_RADIUS }}
+              pin={pendingWalk}
+              clickMode="point"
+              onMapClick={onMapClick}
+              focus={{ lat: here.lat, lng: here.lng, zoom: 16 }}
+            />
+          </div>
+          {pendingWalk && (
+            <div className="eg-walkbar">
+              <span>Walk <b>{pendingWalk.meters}m</b> · ~{pendingWalk.mins} min</span>
+              <button className="mw-cancel" onClick={() => setPendingWalk(null)}>Cancel</button>
+              <button className="mw-go" onClick={doWalk}>Walk</button>
+            </div>
+          )}
         </div>
       </aside>
       <div className="eg-controls">
-        <button className="sv-btn ghost" onClick={onWalk}>Walk here</button>
         <button className="sv-btn eg-drop" onClick={onDropPin}>📍 Drop pin & tag</button>
       </div>
     </div>

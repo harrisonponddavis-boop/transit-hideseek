@@ -61,6 +61,17 @@ module.exports = {
       stops: ['MIDWAY', 'WESTERNOR', 'ROOSEVELT', 'CLARKLAKE'],
       hops: [6, 8, 3] },
   ],
+  // Each station's real district, for the "same district?" region question.
+  stationRegions: {
+    CLARKLAKE: 'LOOP', LAKE: 'LOOP', ROOSEVELT: 'LOOP',
+    FULLERTON: 'LPK', CLARKDIV: 'LPK', ARMITAGE: 'LPK',
+    HOWARD: 'LKV', WILSON: 'LKV', BELMONT: 'LKV',
+    OHARE: 'WP', JEFFPARK: 'WP', LOGAN: 'WP', DAMENBLUE: 'WP', DIVISION: 'WP',
+    FORESTPK: 'WP', KIMBALL: 'WP', WESTERNBR: 'WP', HARLEM: 'WP',
+    CERMAK: 'PIL', UICHALSTED: 'PIL', ASHLANDGR: 'PIL', WESTERNOR: 'PIL',
+    SOX35: 'BRZ', BRONZE35: 'BRZ',
+    DANRYAN95: 'HP', GARFIELD: 'HP', COTTAGE: 'HP', MIDWAY: 'HP',
+  },
   pois: [
     { id: 'ORD', category: 'airport', name: "O'Hare Int'l",   lat: 41.9786, lng: -87.9047 },
     { id: 'MDW', category: 'airport', name: 'Midway Int’l',   lat: 41.7866, lng: -87.7376 },

@@ -16,6 +16,13 @@ const VEHICLES = { sf: 'bus', chicago: 'train', nyc: 'train', tokyo: 'train' };
 const TRANSFER_PENALTY = 0; // kept simple
 
 function buildCity(def) {
+  // tag each station with its real neighbourhood/borough/ward for region matching
+  if (def.stationRegions) {
+    for (const [id, region] of Object.entries(def.stationRegions)) {
+      if (def.stations[id]) def.stations[id].region = region;
+    }
+  }
+
   const graph = {};
   for (const id of Object.keys(def.stations)) graph[id] = [];
   for (const line of def.lines) {

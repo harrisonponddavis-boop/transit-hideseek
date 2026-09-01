@@ -65,6 +65,7 @@ export function geoConstraints(feed, network) {
         return [{ kind: 'halfplane', center: q.center, dir: q.answer }];
       }
       if (q.type === 'matching' && network) {
+        if (q.region) return []; // regions filter whole stations, no point-level shape
         const m = matchPois(network, q);
         if (!m || !m.rivals.length) return [];
         return [{ kind: q.answer.startsWith('YES') ? 'cellIn' : 'cellOut', star: m.star, rivals: m.rivals }];
@@ -102,6 +103,9 @@ export function possibleStations(network, feed, zoneR) {
         if (q.answer === 'SOUTH' && s.lat - latPad > q.center.lat) return false;
         if (q.answer === 'EAST' && s.lng + lngPad < q.center.lng) return false;
         if (q.answer === 'WEST' && s.lng - lngPad > q.center.lng) return false;
+      } else if (q.type === 'matching' && q.region) {
+        // same-region questions keep/drop whole stations by their real region
+        if (yes ? s.region !== q.poiId : s.region === q.poiId) return false;
       } else if (q.type === 'matching') {
         const m = matchPois(network, q);
         if (m && m.rivals.length) {

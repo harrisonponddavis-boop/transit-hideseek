@@ -72,6 +72,17 @@ module.exports = {
       stops: ['WP', 'STON', 'SFSU', 'BALB'],
       hops: [4, 2, 6] },
   ],
+  // Each station's real district, for the "same district?" region question.
+  stationRegions: {
+    EMB: 'DT', MONT: 'DT', POWL: 'DT', CIVC: 'DT', CTWN: 'DT', YB: 'DT', BRAN: 'DT', K4: 'DT',
+    M16: 'MIS', M24: 'MIS',
+    CAS: 'CASD', CHU: 'CASD', CH18: 'CASD', CH24: 'CASD', CH30: 'CASD', GLEN: 'CASD',
+    VAN: 'HAI', CARL: 'HAI', UCSF: 'HAI',
+    FOR: 'SUN', WP: 'SUN', JUD9: 'SUN', JUD19: 'SUN', JUD28: 'SUN', SUNJ: 'SUN', OB: 'SUN',
+    TAR22: 'SUN', SUNT: 'SUN', ZOO: 'SUN', STON: 'SUN', SFSU: 'SUN',
+    CHASE: 'BAY', DOG: 'BAY', EVANS: 'BAY',
+    BALB: 'EXC', CCSF: 'EXC',
+  },
   // Landmarks for "matching" questions — is your nearest ___ the same as ours?
   // Each category needs at least two so the map actually partitions.
   // District anchors are neighborhood centroids; nearest-anchor ≈ which one.

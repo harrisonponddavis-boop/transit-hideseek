@@ -518,7 +518,7 @@ function GameBoard({ state, network, act, flash, theme, embedKey, onEnterImmersi
                 <div className="qgrid">
                   {network.matchCategories.map((c) => (
                     <button key={c.id} className="qbtn" disabled={state.coins < c.cost}
-                      {...hoverProps({ type: 'match', category: c.id })}
+                      {...hoverProps({ type: 'match', category: c.id, region: !!c.region })}
                       onClick={() => askQ('matching', { category: c.id })}>
                       {c.region ? `Same ${c.label}?` : `Nearest ${c.label}?`} <span className="cost">{c.cost}¢</span>
                     </button>
@@ -627,7 +627,7 @@ function GameBoard({ state, network, act, flash, theme, embedKey, onEnterImmersi
               {...(f.type === 'radar' && f.center
                 ? hoverProps({ type: 'radarResult', center: f.center, radiusKm: f.radiusKm, yes: f.answer.startsWith('YES') })
                 : f.type === 'matching'
-                ? hoverProps({ type: 'matchResult', category: f.category, poiId: f.poiId, yes: f.answer.startsWith('YES') })
+                ? hoverProps({ type: 'matchResult', category: f.category, poiId: f.poiId, yes: f.answer.startsWith('YES'), region: f.region })
                 : {})}>
               <span className="t">T+{f.clock} min</span>
               {f.kind === 'question' ? (

@@ -388,6 +388,22 @@ export default function MapView({
         dl.addLayer(L.circleMarker([seekerPos.lat, seekerPos.lng], {
           radius: 6, color: '#ffb000', weight: 3, fillOpacity: 0.4, ...passive,
         }));
+      } else if ((preview.type === 'match' || preview.type === 'matchResult') && preview.region) {
+        // region question: light up every station in the matched neighbourhood
+        const regionId = preview.type === 'matchResult' ? preview.poiId : network.stations[seekerStation]?.region;
+        const yes = preview.type === 'match' ? true : preview.yes;
+        const color = preview.type === 'matchResult' ? (yes ? '#28c76f' : '#ef4b5d') : '#ffb000';
+        const poi = (network.pois || []).find((p) => p.id === regionId);
+        for (const s of Object.values(network.stations)) {
+          if (s.region && s.region === regionId) {
+            dl.addLayer(L.circle([s.lat, s.lng], {
+              radius: 300, color, weight: 2, fillColor: color, fillOpacity: 0.18, ...passive,
+            }));
+          }
+        }
+        if (poi) dl.addLayer(L.circleMarker([poi.lat, poi.lng], {
+          radius: 6, color, weight: 3, fillColor: '#1b1407', fillOpacity: 0.9, ...passive,
+        }).bindTooltip(`<b>${poi.name}</b>`, { permanent: true, direction: 'top' }));
       } else if ((preview.type === 'match' || preview.type === 'matchResult') && network.pois) {
         const pois = network.pois.filter((p) => p.category === preview.category);
         // which landmark anchors the cell: the answered one, or the seeker's nearest

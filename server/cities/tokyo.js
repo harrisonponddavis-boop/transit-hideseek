@@ -51,6 +51,16 @@ module.exports = {
       stops: ['SHIMBASHI', 'TOYOSU', 'ODAIBA'],
       hops: [8, 6] },
   ],
+  // Each station's real ward, for the "same ward?" region question.
+  stationRegions: {
+    TOKYO: 'CHIYODA', KANDA: 'CHIYODA', AKIHABARA: 'CHIYODA', OCHANOMIZU: 'CHIYODA',
+    UENO: 'TAITO', NIPPORI: 'TAITO', ASAKUSA: 'TAITO',
+    IKEBUKURO: 'TOSHIMA',
+    SHINJUKU: 'SHINJUKUW', YOTSUYA: 'SHINJUKUW', NAKANO: 'SHINJUKUW', KICHIJOJI: 'SHINJUKUW',
+    HARAJUKU: 'SHIBUYAW', SHIBUYA: 'SHIBUYAW',
+    SHINAGAWA: 'MINATO', HAMAMATSU: 'MINATO', SHIMBASHI: 'MINATO', GINZA: 'MINATO',
+    ROPPONGI: 'MINATO', TOYOSU: 'MINATO', ODAIBA: 'MINATO',
+  },
   pois: [
     { id: 'HND', category: 'airport', name: 'Haneda', lat: 35.5494, lng: 139.7798 },
     { id: 'NRT', category: 'airport', name: 'Narita', lat: 35.7720, lng: 140.3929 },

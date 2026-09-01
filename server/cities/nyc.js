@@ -73,6 +73,16 @@ module.exports = {
       stops: ['SFERRY', 'STGEO', 'TOMPK'],
       hops: [25, 4] },
   ],
+  // Each station's real borough, for the "same borough?" region question.
+  stationRegions: {
+    TSQ: 'MAN', GCT: 'MAN', HER: 'MAN', PENN: 'MAN', US14: 'MAN', W4: 'MAN', PABT: 'MAN',
+    CANAL: 'MAN', CHAM: 'MAN', FULTON: 'MAN', SFERRY: 'MAN', CC59: 'MAN', L59: 'MAN',
+    L86: 'MAN', L125: 'MAN', UWS86: 'MAN', UWS125: 'MAN', L14_8: 'MAN',
+    B149: 'BRX', B161: 'BRX', BFORD: 'BRX',
+    BORO: 'BKN', ATL: 'BKN', DEKALB: 'BKN', JAY: 'BKN', BEDFD: 'BKN', CONEY: 'BKN',
+    COURT: 'QNS', QBP: 'QNS', JKHTS: 'QNS', FLUSH: 'QNS',
+    STGEO: 'STAT', TOMPK: 'STAT',
+  },
   // Landmarks for "matching" questions — is your nearest ___ the same as ours?
   // Borough anchors are centroids; nearest-anchor ≈ which borough you're in.
   pois: [

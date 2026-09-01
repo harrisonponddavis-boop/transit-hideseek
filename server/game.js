@@ -80,6 +80,21 @@ function nearestPoi(pois, pos) {
   return best;
 }
 
+// Which region (borough/district/ward) a point is in. Each station carries its
+// real neighbourhood label, and a hider always hides within a zone of a station,
+// so the nearest station's region is the true region — no fuzzy Voronoi cells.
+function nearestStation(city, pt) {
+  let best = null, bestD = Infinity;
+  for (const s of Object.values(city.stations)) {
+    const d = haversineMeters(pt.lat, pt.lng, s.lat, s.lng);
+    if (d < bestD) { bestD = d; best = s; }
+  }
+  return best;
+}
+function regionAt(city, pt) {
+  return nearestStation(city, pt)?.region || null;
+}
+
 // Categories a city can actually offer (2+ landmarks), with labels + costs
 function matchCategoriesFor(city) {
   return Object.entries(MATCH_CATEGORIES)
@@ -480,14 +495,24 @@ function ask(game, type, params = {}) {
   } else if (type === 'matching') {
     const cat = MATCH_CATEGORIES[params.category];
     const pois = poisOf(city, params.category);
-    const ourNearest = nearestPoi(pois, here);
-    const hiderNearest = nearestPoi(pois, { lat: game.hider.lat, lng: game.hider.lng });
-    const same = ourNearest.id === hiderNearest.id;
-    answer = same ? `YES — same ${cat.label}` : `NO — different ${cat.label}`;
-    label = cat.region
-      ? `Region: are you in the same ${cat.label} as us? (ours: ${ourNearest.name})`
-      : `Matching: is your nearest ${cat.label} the same as ours? (ours: ${ourNearest.name})`;
-    extra = { category: params.category, poiId: ourNearest.id };
+    if (cat.region) {
+      // regions: compare the real neighbourhood you're standing in
+      const ourId = regionAt(city, here);
+      const hiderStation = city.stations[game.hider.stationId];
+      const theirId = hiderStation?.region || regionAt(city, { lat: game.hider.lat, lng: game.hider.lng });
+      const same = ourId === theirId;
+      const ourName = pois.find((p) => p.id === ourId)?.name || ourId;
+      answer = same ? `YES — same ${cat.label}` : `NO — different ${cat.label}`;
+      label = `Region: are you in the same ${cat.label} as us? (ours: ${ourName})`;
+      extra = { category: params.category, poiId: ourId, region: true };
+    } else {
+      const ours = nearestPoi(pois, here);
+      const theirs = nearestPoi(pois, { lat: game.hider.lat, lng: game.hider.lng });
+      const same = ours.id === theirs.id;
+      answer = same ? `YES — same ${cat.label}` : `NO — different ${cat.label}`;
+      label = `Matching: is your nearest ${cat.label} the same as ours? (ours: ${ours.name})`;
+      extra = { category: params.category, poiId: ours.id, region: false };
+    }
   } else if (type === 'photo') {
     const kind = PHOTO_KINDS[params.kind];
     answer = 'WAITING FOR THE HIDER…';

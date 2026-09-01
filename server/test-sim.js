@@ -55,6 +55,35 @@ assert(matchCategoriesFor(getCity('nyc')).find((c) => c.id === 'borough')?.regio
 assert(!matchCategoriesFor(getCity('nyc')).find((c) => c.id === 'borough')?.label.includes('district'));
 console.log('✓ borough/district region matching: same-region compare + region flag');
 
+// --- Every station in a region-city carries a valid neighbourhood label ---
+{
+  const REGION_CATS = ['borough', 'district', 'ward'];
+  for (const { id } of cityList) {
+    const c = getCity(id);
+    if (!matchCategoriesFor(c).some((x) => x.region)) continue;
+    const regionIds = new Set(c.pois.filter((p) => REGION_CATS.includes(p.category)).map((p) => p.id));
+    for (const s of Object.values(c.stations)) {
+      assert(s.region, `${id}: station ${s.id} has no region label`);
+      assert(regionIds.has(s.region), `${id}: station ${s.id} has unknown region "${s.region}"`);
+    }
+    console.log(`✓ ${id}: all ${Object.keys(c.stations).length} stations labelled with a real region`);
+  }
+}
+
+// --- Region matching: seeker + hider in the same borough answers YES ---
+{
+  const g = createGame('HR', 'H', 'nyc');
+  g.players.push({ id: 'SR', name: 'S', role: 'seeker' });
+  g.phase = 'hiding';
+  const coney = getCity('nyc').stations.CONEY;
+  assert(setHider(g, 'HR', 'CONEY', coney.lat + 0.001, coney.lng).ok);
+  g.coins = 30;
+  move(g, 'ATL'); // Atlantic Av–Barclays Ctr is Brooklyn, like Coney
+  const same = ask(g, 'matching', { category: 'borough' });
+  assert(same.ok && same.answer.startsWith('YES'), `same borough should be YES, got ${same.answer}`);
+  console.log('✓ region matching: seeker + hider both in Brooklyn → YES');
+}
+
 // --- Ride coins scale with trip length ---
 {
   const cg = createGame('CX', 'x');
@@ -323,6 +352,16 @@ async function testMatching() {
   assert(cons[0].star.id === 'CPZOO' && cons[0].rivals.length === 3, 'cell anchored on CP zoo vs 3 rivals');
   assert(geoConstraints(yes, net)[0].kind === 'cellIn', 'YES emits a cellIn constraint');
   console.log('✓ matching solver: Voronoi-cell elimination flips with YES/NO; cellIn/cellOut emitted');
+
+  // region matching filters whole stations by their real borough — no Voronoi
+  const bkYes = [{ kind: 'question', type: 'matching', category: 'borough', poiId: 'BKN', region: true, answer: 'YES — same borough' }];
+  const keptBk = possibleStations(net, bkYes, 500);
+  assert(keptBk.length > 0 && keptBk.every((s) => s.region === 'BKN'), 'region YES keeps only that borough');
+  assert(keptBk.some((s) => s.id === 'CONEY'), 'Brooklyn set includes Coney');
+  assert(geoConstraints(bkYes, net).length === 0, 'region matching emits no geometric constraint');
+  const bkNo = [{ kind: 'question', type: 'matching', category: 'borough', poiId: 'BKN', region: true, answer: 'NO — different borough' }];
+  assert(possibleStations(net, bkNo, 500).every((s) => s.region !== 'BKN'), 'region NO drops that borough');
+  console.log('✓ region matching solver: keeps/drops whole boroughs by station label');
 }
 
 // --- Client exclusion solver (shared module) ---

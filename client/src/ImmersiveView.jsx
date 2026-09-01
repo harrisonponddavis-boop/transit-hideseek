@@ -514,8 +514,8 @@ function previewTools(network) {
     { key: 'stn', label: 'Right station', pv: { type: 'station' }, hint: 'Right station — is your current station the hider’s home?' },
   ];
   (network?.matchCategories || []).forEach((c) =>
-    t.push({ key: `m${c.id}`, label: c.region ? `Same ${c.label}` : `Near ${c.label}`, pv: { type: 'match', category: c.id },
-      hint: `Matching — do you share the same ${c.label} region as the hider?` }));
+    t.push({ key: `m${c.id}`, label: c.region ? `Same ${c.label}` : `Near ${c.label}`, pv: { type: 'match', category: c.id, region: !!c.region },
+      hint: c.region ? `Same ${c.label} — lights up every station in your ${c.label}.` : `Nearest ${c.label} — splits the map by closest ${c.label}.` }));
   t.push({ key: 'r100', label: 'Radar 100m', pv: { type: 'radar', radiusKm: 0.1 }, hint: 'Radar 100m — endgame ring right around you.' });
   t.push({ key: 'r250', label: 'Radar 250m', pv: { type: 'radar', radiusKm: 0.25 }, hint: 'Radar 250m — endgame ring around you.' });
   return t;

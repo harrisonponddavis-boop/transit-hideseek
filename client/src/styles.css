@@ -842,3 +842,44 @@ a { color: var(--amber); }
   .imm-here, .onboard, .eg-banner, .eg-side, .stop-compass, .map-legend, .vehicle { animation: none !important; }
   .vehicle.boarding { animation: none !important; opacity: 0.4; }
 }
+
+/* ================= immersive "bus rolling up" scene ================= */
+.bus-scene { position: absolute; inset: 0; z-index: 60; display: flex; flex-direction: column; justify-content: flex-end;
+  background: linear-gradient(180deg, rgba(6,8,12,0.28) 0%, rgba(6,8,12,0) 26%, rgba(6,8,12,0.5) 74%, rgba(6,8,12,0.9) 100%); }
+.bus-scene-back { position: absolute; top: 16px; left: 16px; z-index: 3; font-family: var(--mono); font-size: 13px; font-weight: 600;
+  background: rgba(8,9,12,0.9); color: #ffd23f; border: 1px solid rgba(255,210,63,0.5); border-radius: 11px; padding: 9px 15px; cursor: pointer; }
+.bus-scene-back:hover { background: #ffd23f; color: #0b0d11; }
+.bus-scene-title { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); z-index: 3;
+  font-family: var(--display); font-size: 18px; letter-spacing: 0.04em; color: #fff;
+  background: #101319; border: 1px solid rgba(255,255,255,0.14); border-left: 4px solid #ffd23f;
+  border-radius: 8px; padding: 7px 15px; box-shadow: 0 4px 18px rgba(0,0,0,0.55); }
+
+.arriving-vehicle { position: absolute; left: 0; right: 0; bottom: 150px; display: flex; justify-content: center; pointer-events: none; }
+.veh-svg { width: min(680px, 92vw); height: auto; filter: drop-shadow(0 16px 26px rgba(0,0,0,0.55)); }
+.veh-door { transform-origin: left center; transition: transform 0.4s ease, opacity 0.4s ease; }
+.arriving-vehicle.arriving { animation: vehArrive 0.75s cubic-bezier(0.16,0.9,0.3,1); }
+@keyframes vehArrive { 0% { transform: translateX(75%); } 100% { transform: translateX(0); } }
+.arriving-vehicle.leaving { animation: vehLeave 0.56s cubic-bezier(0.5,0,0.85,0.5) forwards; }
+@keyframes vehLeave { to { transform: translateX(-150%); opacity: 0.35; } }
+.arriving-vehicle.boarding { animation: vehBoard 0.72s ease forwards; }
+@keyframes vehBoard { 30% { transform: scale(1.03); } 100% { transform: scale(1.55); opacity: 0; } }
+.arriving-vehicle.boarding .veh-door { transform: translateX(-26px); opacity: 0; }
+
+.bus-scene-bar { position: relative; z-index: 2; margin: 0 auto 30px; width: min(560px, 94vw);
+  background: rgba(10,12,17,0.93); border: 1px solid #2a3140; border-radius: 16px; padding: 15px 18px; text-align: center;
+  box-shadow: 0 12px 34px rgba(0,0,0,0.55); animation: fadeIn 0.4s ease; }
+.bsb-line { font-family: var(--display); font-size: 26px; font-weight: 700; letter-spacing: 0.03em; line-height: 1.05; }
+.bsb-eta { font-family: var(--mono); font-size: 12px; color: #aeb4c0; margin: 3px 0 13px; }
+.bsb-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.bsb-skip { font-family: var(--mono); font-size: 13px; background: #0d0f14; color: #ffd23f;
+  border: 1px solid rgba(255,210,63,0.45); border-radius: 11px; padding: 11px 16px; cursor: pointer; }
+.bsb-skip:hover:not(:disabled) { background: #ffd23f; color: #0b0d11; }
+.bsb-skip:disabled { opacity: 0.4; cursor: default; }
+.bsb-board { font-family: var(--display); font-size: 18px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+  background: #ffd23f; color: #0b0d11; border: none; border-radius: 11px; padding: 11px 22px; cursor: pointer; }
+.bsb-board:hover:not(:disabled) { filter: brightness(1.07); }
+.bsb-board:disabled { opacity: 0.5; cursor: default; }
+
+@media (prefers-reduced-motion: reduce) {
+  .arriving-vehicle.arriving, .arriving-vehicle.leaving, .arriving-vehicle.boarding, .bus-scene-bar { animation: none !important; }
+}

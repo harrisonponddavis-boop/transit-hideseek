@@ -3,8 +3,8 @@ import L from 'leaflet';
 import { possibleStations } from './solver';
 
 const TILES = {
-  dark: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-  light: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+  dark: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+  light: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',
 };
 
 // Compact map: still-possible station zones (amber) + the seeker's position.
@@ -21,7 +21,7 @@ export default function MiniMap({ network, feed, zoneR, seekerPos, seekerStation
     const map = L.map(ref.current, {
       zoomControl: !!onRide, attributionControl: false, keyboard: false,
     });
-    L.tileLayer(TILES[theme] || TILES.dark, { maxZoom: 20 }).addTo(map);
+    L.tileLayer(TILES[theme] || TILES.dark, { attribution: 'Tiles &copy; Esri', maxNativeZoom: 16, maxZoom: 20 }).addTo(map);
 
     for (const line of network.lines) {
       const pts = line.stops.map((id) => [network.stations[id].lat, network.stations[id].lng]);

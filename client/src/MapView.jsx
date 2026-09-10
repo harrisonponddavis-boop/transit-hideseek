@@ -2,9 +2,16 @@ import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
+// Esri gray canvas — keyless, clean, and made for overlaying coloured data
+// (CARTO's basemaps now watermark unauthenticated tiles).
 const TILE_URLS = {
-  dark: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-  light: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+  dark: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+  light: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+};
+// streets + labels overlay (sits under the transit lines) for map context
+const REF_URLS = {
+  dark: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}',
+  light: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}',
 };
 const MARKER_COLORS = {
   dark: { stroke: '#e8e4d8', fill: '#0b0d11' },
@@ -183,6 +190,7 @@ export default function MapView({
   const mapRef = useRef(null);
   const containerRef = useRef(null);
   const tileRef = useRef(null);
+  const refTileRef = useRef(null);
   const dynLayer = useRef(null);
   const shadeCanvas = useRef(null);
   const shadeData = useRef(null);
@@ -197,8 +205,11 @@ export default function MapView({
     if (focus) map.setView([focus.lat, focus.lng], focus.zoom || 16);
     else map.setView(network.center || [37.7649, -122.4394], network.zoom || 13);
     tileRef.current = L.tileLayer(TILE_URLS[theme] || TILE_URLS.dark, {
-      attribution: '&copy; OpenStreetMap &copy; CARTO',
-      maxZoom: 20,
+      attribution: 'Tiles &copy; Esri',
+      maxNativeZoom: 16, maxZoom: 20,
+    }).addTo(map);
+    refTileRef.current = L.tileLayer(REF_URLS[theme] || REF_URLS.dark, {
+      maxNativeZoom: 16, maxZoom: 20, opacity: 0.85,
     }).addTo(map);
 
     for (const line of network.lines) {
@@ -260,6 +271,7 @@ export default function MapView({
   // theme swap: tiles change, marker colors are handled by the dynamic effect
   useEffect(() => {
     tileRef.current?.setUrl(TILE_URLS[theme] || TILE_URLS.dark);
+    refTileRef.current?.setUrl(REF_URLS[theme] || REF_URLS.dark);
   }, [theme]);
 
   // follow the focus point (e.g. the seeker walking around in the endgame)

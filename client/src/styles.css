@@ -777,3 +777,68 @@ a { color: var(--amber); }
 
 /* light-mode extras */
 .phone.light .maps-walkbar, .phone.light .map-legend { /* maps app is fullscreen, not inside phone; no-op guard */ }
+
+/* ================= animations & the animated bus stop ================= */
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes phoneIn { from { transform: translateY(26px) scale(0.96); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes screenIn { from { opacity: 0; transform: translateX(14px); } to { opacity: 1; transform: none; } }
+@keyframes bubbleIn { from { opacity: 0; transform: translateY(9px); } to { opacity: 1; transform: none; } }
+@keyframes bannerDown { from { opacity: 0; transform: translate(-50%, -14px); } to { opacity: 1; transform: translateX(-50%); } }
+@keyframes onboardIn { from { opacity: 0; transform: translateY(26px); } to { opacity: 1; transform: none; } }
+
+/* flow polish */
+.phone-backdrop { animation: fadeIn 0.18s ease; }
+.phone { animation: phoneIn 0.3s cubic-bezier(0.2,0.85,0.25,1); }
+.phone-screen > .app-view, .phone-screen > .home-screen { animation: screenIn 0.26s ease; }
+.txt-pair, .texts-thread .txt-note { animation: bubbleIn 0.3s ease backwards; }
+.imm-here { animation: bannerDown 0.5s cubic-bezier(0.2,0.8,0.2,1); }
+.onboard { animation: onboardIn 0.45s cubic-bezier(0.2,0.8,0.2,1); }
+.eg-banner { animation: bannerDown 0.5s cubic-bezier(0.2,0.8,0.2,1); }
+.eg-side { animation: fadeIn 0.5s ease 0.12s backwards; }
+.stop-compass { animation: fadeIn 0.3s ease; }
+.map-legend { animation: fadeIn 0.3s ease; }
+
+/* the bus/train stop: vehicles pull up, you tap yours, doors open, you board */
+.stop-lane { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden;
+  padding: 14px 12px 6px; display: flex; flex-direction: column; gap: 20px; }
+.vehicle { position: relative; display: block; width: 100%; height: 74px; flex: none;
+  background: none; border: none; padding: 0; cursor: pointer;
+  animation: pullUp 0.6s cubic-bezier(0.16,0.9,0.3,1) backwards; animation-delay: calc(var(--i) * 0.13s); }
+@keyframes pullUp { 0% { transform: translateX(118%); opacity: 0; } 55% { opacity: 1; } 100% { transform: translateX(0); opacity: 1; } }
+.vehicle:hover:not(:disabled) { transform: translateY(-3px); }
+.vehicle:disabled { cursor: default; }
+.v-eta { position: absolute; top: -3px; right: 8px; z-index: 3;
+  font-family: var(--mono); font-size: 10px; letter-spacing: 0.04em; color: #cfd4de; }
+.v-roof { position: absolute; top: 8px; left: 12px; right: 18px; height: 12px; border-radius: 12px 12px 0 0;
+  background: var(--vcolor); filter: brightness(0.78); }
+.v-body { position: absolute; top: 16px; left: 2px; right: 10px; height: 44px; border-radius: 11px;
+  background: var(--vcolor); box-shadow: 0 7px 16px rgba(0,0,0,0.55), inset 0 -6px 10px rgba(0,0,0,0.18);
+  display: flex; align-items: center; gap: 8px; padding: 0 12px; overflow: hidden; }
+.v-route { font-family: var(--display); font-weight: 700; font-size: 17px; letter-spacing: 0.02em; color: var(--vtext);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 44%; z-index: 2; }
+.v-windows { display: flex; gap: 5px; flex: 1; align-items: center; }
+.v-windows i { flex: 1; height: 20px; border-radius: 3px; background: rgba(233,240,247,0.82); box-shadow: inset 0 1px 2px rgba(0,0,0,0.25); }
+.v-door { width: 15px; height: 34px; border-radius: 3px; flex: none; background: rgba(0,0,0,0.3);
+  transform-origin: left center; transition: transform 0.45s ease; }
+.v-wheels { position: absolute; bottom: 0; left: 24px; right: 40px; display: flex; justify-content: space-between; z-index: 2; }
+.v-wheels i { width: 16px; height: 16px; border-radius: 50%; background: #15171c; box-shadow: 0 0 0 3px #3a3f4b; }
+.stop-curb { flex: none; height: 12px; margin: 0 -12px;
+  background: repeating-linear-gradient(90deg, #363b46 0 16px, #262b34 16px 32px); border-top: 2px solid #4a5060; }
+
+/* board: doors slide open, the chosen vehicle rolls up to you, the rest dim */
+.stop-lane.boarding-active .vehicle:not(.boarding) { opacity: 0.22; transition: opacity 0.3s ease; }
+.vehicle.boarding { animation: boardUp 0.76s cubic-bezier(0.4,0,0.6,1) forwards; z-index: 4; }
+@keyframes boardUp { 0% { transform: scale(1); } 35% { transform: scale(1.05); } 100% { transform: scale(1.4); opacity: 0; } }
+.vehicle.boarding .v-door { transform: scaleX(0.05); }
+.vehicle.boarding .v-eta { color: #ffd23f; }
+
+/* light-mode tweaks for the stop */
+.phone.light .v-eta { color: #5c6270; }
+.phone.light .v-windows i { background: rgba(255,255,255,0.95); }
+.phone.light .stop-curb { background: repeating-linear-gradient(90deg, #d6dae2 0 16px, #c7ccd6 16px 32px); border-top-color: #b7bcc7; }
+
+@media (prefers-reduced-motion: reduce) {
+  .phone, .phone-backdrop, .phone-screen > *, .txt-pair, .texts-thread .txt-note,
+  .imm-here, .onboard, .eg-banner, .eg-side, .stop-compass, .map-legend, .vehicle { animation: none !important; }
+  .vehicle.boarding { animation: none !important; opacity: 0.4; }
+}

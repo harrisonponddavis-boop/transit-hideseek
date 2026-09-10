@@ -245,11 +245,14 @@ function BusApp({ state, network, act, nearStop, distFromStop, onReturn, onBoard
 
   const lines = (network.lines || []).filter((l) => l.stops.includes(here));
 
-  const board = async (lineId) => {
+  const board = (lineId) => {
+    if (boarding) return;
     setBoarding(lineId);
-    const r = await act('board', { lineId });
-    setBoarding(null);
-    if (!r?.error) onBoarded();
+    // let the doors-open + pull-in animation play, then actually board
+    setTimeout(async () => {
+      const r = await act('board', { lineId });
+      if (r?.error) setBoarding(null); else onBoarded();
+    }, 760);
   };
 
   if (!nearStop) {
@@ -267,23 +270,29 @@ function BusApp({ state, network, act, nearStop, distFromStop, onReturn, onBoard
 
   return (
     <div className="app-view bus-app">
-      <div className="app-bar"><span className="ab-title">{vehicle === 'bus' ? '🚌' : '🚆'} Departures</span></div>
-      <div className="app-sub">{network.stations[here]?.name} · next {plural}</div>
-      <div className="dep-list">
-        {lines.map((l) => {
+      <div className="app-bar"><span className="ab-title">{vehicle === 'bus' ? '🚌' : '🚆'} At the {stopWord}</span></div>
+      <div className="app-sub">{network.stations[here]?.name} · tap your {noun} to board</div>
+      <div className={`stop-lane ${boarding ? 'boarding-active' : ''}`}>
+        {lines.map((l, i) => {
           const wait = state.lineWaits?.[l.id] ?? '?';
           return (
-            <div className="dep-row" key={l.id}>
-              <span className="dep-line" style={{ background: l.color, color: readableOn(l.color) }}>{l.name}</span>
-              <span className="dep-when">arrives in <b>{wait} min</b></span>
-              <button className="dep-board" disabled={boarding} onClick={() => board(l.id)}>
-                {boarding === l.id ? '…' : 'Get on'}
-              </button>
-            </div>
+            <button key={l.id} className={`vehicle ${vehicle} ${boarding === l.id ? 'boarding' : ''}`}
+              style={{ '--i': i, '--vcolor': l.color, '--vtext': readableOn(l.color) }}
+              disabled={!!boarding} onClick={() => board(l.id)}>
+              <span className="v-eta">{boarding === l.id ? 'Boarding…' : `next in ${wait} min`}</span>
+              <span className="v-roof" />
+              <span className="v-body">
+                <span className="v-route">{l.name}</span>
+                <span className="v-windows"><i /><i /><i /><i /></span>
+                <span className="v-door" />
+              </span>
+              <span className="v-wheels"><i /><i /></span>
+            </button>
           );
         })}
         {lines.length === 0 && <p className="bg-text">No lines stop here — that shouldn't happen!</p>}
       </div>
+      <div className="stop-curb" />
     </div>
   );
 }

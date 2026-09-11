@@ -27,7 +27,8 @@ export default function ImmersiveView({ state, network, act, embedKey, onExit })
     try { return localStorage.getItem('ths-phone-theme') || 'dark'; } catch { return 'dark'; }
   });
   const [lightbox, setLightbox] = useState(null);
-  const [busScene, setBusScene] = useState(false); // fullscreen "bus rolling up" scene
+  const [busScene, setBusScene] = useState(false); // fullscreen "at the stop" boarding scene
+  const [traveling, setTraveling] = useState(null); // destination name while the ride wipe plays
 
   const seekerStation = state.seekerStation;
   const aboard = state.aboard;
@@ -114,6 +115,15 @@ export default function ImmersiveView({ state, network, act, embedKey, onExit })
   const closePhone = () => setPhoneOpen(false);
   const returnToStop = () => stopPos && goToPano(stopPos);
 
+  // ride the vehicle to a stop: a brief "travelling" wipe covers the disembark
+  // and the Street View recentering to the destination (the window "moving").
+  const rideTo = async (stationId) => {
+    setTraveling(network?.stations?.[stationId]?.name || 'the next stop');
+    const r = await act('disembark', { stationId });
+    if (r?.error) { setTraveling(null); return; }
+    setTimeout(() => setTraveling(null), 1200);
+  };
+
   const dropPin = async () => {
     const r = await act('walk', pos);
     if (!r?.error) act('guess', pos);
@@ -145,11 +155,11 @@ export default function ImmersiveView({ state, network, act, embedKey, onExit })
         <span className="ih-city">{network?.name}</span>
       </div>
 
-      {aboard && <OnboardView state={state} network={network} act={actRef.current} />}
+      {aboard && <OnboardView state={state} network={network} onRide={rideTo} />}
 
-      {/* immersive boarding: a bus rolls up over the real Street View */}
+      {/* immersive boarding: stand at the real stop (look around), board your line */}
       {!aboard && busScene && (
-        <BusBoarding state={state} network={network}
+        <StopBoarding state={state} network={network}
           onBoard={async (id) => { const r = await act('board', { lineId: id }); if (!r?.error) setBusScene(false); }}
           onCancel={() => setBusScene(false)} />
       )}
@@ -215,6 +225,13 @@ export default function ImmersiveView({ state, network, act, embedKey, onExit })
             </div>
           )}
         </>
+      )}
+
+      {traveling && (
+        <div className="traveling-wipe">
+          <div className="tw-streaks" />
+          <div className="tw-text">Riding to {traveling}…</div>
+        </div>
       )}
 
       {lightbox && (
@@ -313,7 +330,9 @@ function BusApp({ state, network, act, nearStop, distFromStop, onReturn, onBoard
   );
 }
 
-function OnboardView({ state, network, act }) {
+// On the vehicle: the real Street View IS your window (drag to look out), framed
+// by the interior. Pick a stop and `onRide` plays the travel wipe + disembark.
+function OnboardView({ state, network, onRide }) {
   const aboard = state.aboard;
   const vehicle = network.vehicle || 'train';
   const line = (network.lines || []).find((l) => l.id === aboard.lineId);
@@ -324,28 +343,29 @@ function OnboardView({ state, network, act }) {
     .map((id) => ({ id, name: network.stations[id]?.name, mins: alongLine(line, aboard.fromStation, id) }))
     .filter((s) => s.id !== aboard.fromStation);
 
-  const getOff = async (id) => { setGetting(id); await act('disembark', { stationId: id }); setGetting(null); };
+  const getOff = (id) => { setGetting(id); onRide(id); };
 
   return (
-    <div className={`onboard ${vehicle}`}>
-      <div className="onboard-windows"><div className="scenery" /><div className="scenery s2" /></div>
-      <div className="onboard-head">
+    <div className={`onboard-real ${vehicle}`}>
+      <div className="ob-frame" />
+      <div className="ob-interior" />
+      <div className="ob-head">
         <span className="ob-line" style={{ background: line.color, color: readableOn(line.color) }}>{line.name}</span>
-        <h2>{vehicle === 'bus' ? "You're on the bus" : "You're on the train"}</h2>
-        <p>Tell the driver which stop you want.</p>
+        <span className="ob-sub">{vehicle === 'bus' ? "On the bus" : "On the train"} — that's the real street out the window</span>
       </div>
-      <div className="onboard-stops">
-        {stops.map((s) => (
-          <button className="ob-stop" key={s.id} disabled={getting} onClick={() => getOff(s.id)}>
-            <span className="obs-name">{s.name}</span>
-            <span className="obs-time">{s.mins} min</span>
-            <span className="obs-go">{getting === s.id ? '…' : 'Get off here ▸'}</span>
-          </button>
-        ))}
+      <div className="ob-panel">
+        <div className="ob-panel-title">Tell the driver your stop</div>
+        <div className="ob-stops">
+          {stops.map((s) => (
+            <button className="ob-stop" key={s.id} disabled={getting} onClick={() => getOff(s.id)}>
+              <span className="obs-name">{s.name}</span>
+              <span className="obs-time">{s.mins} min</span>
+              <span className="obs-go">{getting === s.id ? '…' : 'Get off ▸'}</span>
+            </button>
+          ))}
+        </div>
+        <button className="ob-cancel" onClick={() => getOff(aboard.fromStation)}>‹ Get off where I boarded</button>
       </div>
-      <button className="ob-cancel" onClick={() => getOff(aboard.fromStation)}>
-        ‹ Get off where I boarded
-      </button>
     </div>
   );
 }
@@ -571,83 +591,68 @@ function EndgameView({ state, network, act, latestPhoto, theme, onDropPin, onPho
   );
 }
 
-// A clean side-profile bus/train drawn in SVG, coloured for its line.
-function VehicleSprite({ color, label, vehicle }) {
-  const train = vehicle !== 'bus';
-  const top = train ? 24 : 34, wy = train ? 60 : 66, wh = 30;
-  return (
-    <svg className="veh-svg" viewBox="0 0 360 150" xmlns="http://www.w3.org/2000/svg">
-      <ellipse cx="180" cy="141" rx="168" ry="9" fill="rgba(0,0,0,0.4)" />
-      <rect x="6" y={top} width="348" height={train ? 92 : 82} rx={train ? 12 : 18} fill={color} />
-      <rect x="6" y={top} width="348" height="20" rx={train ? 12 : 18} fill="rgba(255,255,255,0.14)" />
-      <rect x="22" y={top + 8} width="132" height="20" rx="4" fill="#0b0d11" />
-      <text x="88" y={top + 22} fill="#ffd23f" fontFamily="'IBM Plex Mono', monospace" fontSize="13" fontWeight="700" textAnchor="middle">{String(label).slice(0, 15)}</text>
-      <g fill="#dceffb">
-        <rect x="26" y={wy} width="58" height={wh} rx="5" />
-        <rect x="92" y={wy} width="58" height={wh} rx="5" />
-        <rect x="158" y={wy} width="58" height={wh} rx="5" />
-        <rect x="224" y={wy} width="58" height={wh} rx="5" />
-      </g>
-      <path d={`M292 ${wy} h44 a12 12 0 0 1 12 12 v18 h-56 z`} fill="#eaf6ff" />
-      <rect className="veh-door" x="26" y={wy} width="30" height={train ? 50 : 46} rx="4" fill="rgba(0,0,0,0.32)" />
-      {!train && (
-        <g>
-          <circle cx="90" cy="118" r="18" fill="#111318" /><circle cx="90" cy="118" r="7" fill="#5b6270" />
-          <circle cx="274" cy="118" r="18" fill="#111318" /><circle cx="274" cy="118" r="7" fill="#5b6270" />
-        </g>
-      )}
-      <rect x="348" y={train ? 96 : 100} width="7" height="11" rx="2" fill="#fff3b0" />
-    </svg>
-  );
-}
-
-// Sit at the stop (real Street View behind) and watch buses roll up. Skip the
-// ones that aren't yours; board when the right line arrives.
-function BusBoarding({ state, network, onBoard, onCancel }) {
+// Stand at the real stop — the Street View stays behind you and you can drag to
+// look all the way around. No drawn vehicle; you board your line from a clean
+// card. Train cities show a platform board (B1/B2…) first.
+function StopBoarding({ state, network, onBoard, onCancel }) {
   const here = state.seekerStation;
   const vehicle = network.vehicle || 'train';
-  const noun = vehicle === 'bus' ? 'bus' : 'train';
+  const isTrain = vehicle !== 'bus';
+  const noun = isTrain ? 'train' : 'bus';
   const lines = (network.lines || []).filter((l) => l.stops.includes(here));
+  const [platform, setPlatform] = useState(isTrain ? null : 0); // trains pick a platform first
   const [idx, setIdx] = useState(0);
-  const [phase, setPhase] = useState('arriving'); // 'arriving' | 'leaving' | 'boarding'
+  const [phase, setPhase] = useState('arriving'); // 'arriving' | 'boarding'
+  const wait = (id) => state.lineWaits?.[id] ?? '?';
+
+  // train departures board — each line is a platform you walk to
+  if (isTrain && platform === null) {
+    return (
+      <div className="stop-scene">
+        <button className="bus-scene-back" onClick={onCancel}>‹ Back</button>
+        <div className="stop-hint">↔ Drag to look around the station</div>
+        <div className="platform-board">
+          <div className="pb-title">🚉 {network.stations[here]?.name} — Departures</div>
+          <div className="pb-rows">
+            {lines.map((l, i) => (
+              <div className="pb-row" key={l.id}>
+                <button className="pb-plat" onClick={() => { setIdx(i); setPlatform(i); setPhase('arriving'); }}>B{i + 1}</button>
+                <span className="pb-line" style={{ color: l.color }}>{l.name}</span>
+                <span className="pb-eta">next in {wait(l.id)} min</span>
+                <button className="pb-go" onClick={() => { setIdx(i); setPlatform(i); setPhase('arriving'); }}>Go to platform ›</button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const line = lines[idx];
   const nextLine = lines[(idx + 1) % (lines.length || 1)];
-  const wait = state.lineWaits?.[line?.id] ?? '?';
-
-  const skip = () => {
-    if (phase !== 'arriving' || lines.length < 2) return;
-    setPhase('leaving');
-    setTimeout(() => { setIdx((i) => (i + 1) % lines.length); setPhase('arriving'); }, 560);
-  };
-  const getOn = () => {
-    if (phase !== 'arriving') return;
-    setPhase('boarding');
-    setTimeout(() => onBoard(line.id), 720);
-  };
-
   if (!line) return null;
+  const skip = () => { if (phase === 'arriving' && lines.length > 1) setIdx((i) => (i + 1) % lines.length); };
+  const board = () => { if (phase !== 'arriving') return; setPhase('boarding'); setTimeout(() => onBoard(line.id), 620); };
+
   return (
-    <div className="bus-scene">
-      <button className="bus-scene-back" onClick={onCancel}>‹ Back</button>
-      <div className="bus-scene-title">🚏 {network.stations[here]?.name} · {noun} stop</div>
-
-      <div className={`arriving-vehicle ${phase}`} key={`${line.id}-${phase === 'boarding' ? 'b' : 'a'}`}>
-        <VehicleSprite color={line.color} label={line.name} vehicle={vehicle} />
-      </div>
-
-      <div className="bus-scene-bar">
-        <div className="bsb-line" style={{ color: line.color }}>{line.name}</div>
-        <div className="bsb-eta">{phase === 'boarding' ? 'Doors opening — hop on!' : `pulling up now · was due in ${wait} min`}</div>
-        <div className="bsb-actions">
-          {lines.length > 1 && (
-            <button className="bsb-skip" onClick={skip} disabled={phase !== 'arriving'}>
-              Not mine — skip to {nextLine.name} ›
-            </button>
+    <div className="stop-scene">
+      <button className="bus-scene-back" onClick={isTrain ? () => setPlatform(null) : onCancel}>‹ {isTrain ? 'Platforms' : 'Back'}</button>
+      <div className="stop-hint">↔ Drag to look around · your {noun} is pulling in</div>
+      <div className={`arrival-card ${phase}`}>
+        <div className="ac-badge" style={{ background: line.color, color: readableOn(line.color) }}>
+          {isTrain ? `Platform B${idx + 1}` : 'Now arriving'}
+        </div>
+        <div className="ac-line" style={{ color: line.color }}>{line.name}</div>
+        <div className="ac-eta">
+          {phase === 'boarding'
+            ? 'Doors opening — hop on!'
+            : <><span className="ac-dot" style={{ background: line.color }} />pulling in now · was due in {wait(line.id)} min</>}
+        </div>
+        <div className="ac-actions">
+          {!isTrain && lines.length > 1 && (
+            <button className="bsb-skip" onClick={skip} disabled={phase === 'boarding'}>Not mine — skip to {nextLine.name} ›</button>
           )}
-          <button className="bsb-board" onClick={getOn} disabled={phase !== 'arriving'}>
-            Get on the {line.name}
-          </button>
+          <button className="bsb-board" onClick={board} disabled={phase === 'boarding'}>Board the {line.name}</button>
         </div>
       </div>
     </div>

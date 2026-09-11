@@ -883,3 +883,70 @@ a { color: var(--amber); }
 @media (prefers-reduced-motion: reduce) {
   .arriving-vehicle.arriving, .arriving-vehicle.leaving, .arriving-vehicle.boarding, .bus-scene-bar { animation: none !important; }
 }
+
+/* ============ real-Street-View boarding (look around, no drawn bus) ============ */
+/* pointer-events:none lets you drag the panorama behind to look 360° around */
+.stop-scene { position: absolute; inset: 0; z-index: 60; pointer-events: none;
+  background: linear-gradient(180deg, rgba(6,8,12,0.28) 0%, rgba(6,8,12,0) 30%, rgba(6,8,12,0.5) 76%, rgba(6,8,12,0.9) 100%);
+  display: flex; flex-direction: column; justify-content: flex-end; }
+.stop-scene .bus-scene-back, .arrival-card, .platform-board { pointer-events: auto; }
+.stop-hint { position: absolute; top: 18px; left: 50%; transform: translateX(-50%);
+  font-family: var(--mono); font-size: 12px; color: #fff; background: rgba(10,12,17,0.8);
+  border: 1px solid rgba(255,255,255,0.14); border-radius: 20px; padding: 7px 15px; }
+
+.arrival-card { margin: 0 auto 30px; width: min(560px, 94vw); text-align: center;
+  background: rgba(10,12,17,0.94); border: 1px solid #2a3140; border-radius: 18px; padding: 16px 18px;
+  box-shadow: 0 14px 40px rgba(0,0,0,0.6); animation: cardUp 0.4s cubic-bezier(0.2,0.8,0.2,1); }
+@keyframes cardUp { from { opacity: 0; transform: translateY(22px); } to { opacity: 1; transform: none; } }
+.ac-badge { display: inline-block; font-family: var(--mono); font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; padding: 4px 12px; border-radius: 20px; margin-bottom: 8px; }
+.ac-line { font-family: var(--display); font-size: 30px; font-weight: 700; letter-spacing: 0.02em; line-height: 1.02; }
+.ac-eta { font-family: var(--mono); font-size: 12px; color: #b9bfcc; margin: 5px 0 14px; display: flex; align-items: center; justify-content: center; gap: 7px; }
+.ac-dot { width: 9px; height: 9px; border-radius: 50%; animation: acpulse 1s ease-in-out infinite; }
+@keyframes acpulse { 0%,100% { opacity: 0.35; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1.15); } }
+.ac-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+
+/* train platform board */
+.platform-board { margin: 0 auto 28px; width: min(600px, 95vw);
+  background: rgba(10,12,17,0.95); border: 1px solid #2a3140; border-radius: 16px; overflow: hidden; box-shadow: 0 14px 40px rgba(0,0,0,0.6); animation: cardUp 0.4s ease; }
+.pb-title { font-family: var(--display); font-size: 20px; letter-spacing: 0.04em; color: #fff; padding: 14px 16px 10px; border-bottom: 1px solid #262d3b; }
+.pb-rows { max-height: 46vh; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 8px; }
+.pb-row { display: flex; align-items: center; gap: 12px; padding: 8px 10px; background: #161a23; border: 1px solid #262d3b; border-radius: 12px; }
+.pb-plat { font-family: var(--display); font-size: 20px; font-weight: 700; color: #0b0d11; background: #ffd23f; border: none;
+  border-radius: 10px; width: 46px; height: 46px; flex: none; cursor: pointer; }
+.pb-plat:hover { filter: brightness(1.08); }
+.pb-line { flex: 1; font-family: var(--display); font-size: 18px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pb-eta { font-family: var(--mono); font-size: 12px; color: #cfd4de; flex: none; }
+.pb-go { font-family: var(--mono); font-size: 12px; background: #0d0f14; color: #ffd23f; border: 1px solid rgba(255,210,63,0.45);
+  border-radius: 9px; padding: 9px 12px; cursor: pointer; flex: none; }
+.pb-go:hover { background: #ffd23f; color: #0b0d11; }
+
+/* ============ inside the vehicle: the real Street View is the window ============ */
+.onboard-real { position: absolute; inset: 0; z-index: 90; pointer-events: none; }
+.onboard-real .ob-head, .onboard-real .ob-panel { pointer-events: auto; }
+.ob-frame { position: absolute; inset: 0; border-radius: 26px;
+  box-shadow: inset 0 0 0 16px rgba(8,9,12,0.9), inset 0 0 130px rgba(0,0,0,0.6); }
+.ob-interior { position: absolute; left: 0; right: 0; bottom: 0; height: 24%;
+  background: linear-gradient(180deg, transparent, #05060a 78%); }
+.ob-interior::before { content: ''; position: absolute; left: 50%; bottom: 0; transform: translateX(-50%);
+  width: 120%; height: 60px; background: #0b0d11; border-radius: 50% 50% 0 0 / 100% 100% 0 0; box-shadow: 0 -2px 0 rgba(255,255,255,0.05); }
+.ob-head { position: absolute; top: 16px; left: 16px; display: flex; flex-direction: column; gap: 6px; max-width: 60vw; }
+.ob-head .ob-line { align-self: flex-start; font-family: var(--display); font-size: 16px; font-weight: 700; padding: 5px 13px; border-radius: 8px; }
+.ob-sub { font-family: var(--mono); font-size: 11px; color: #dfe3ea; background: rgba(8,9,12,0.7); padding: 4px 9px; border-radius: 7px; }
+.ob-panel { position: absolute; top: 74px; right: 16px; bottom: 26px; width: min(320px, 46vw);
+  background: rgba(10,12,17,0.9); border: 1px solid #2a3140; border-radius: 14px; display: flex; flex-direction: column; overflow: hidden; }
+.ob-panel-title { font-family: var(--display); font-size: 15px; letter-spacing: 0.06em; text-transform: uppercase; color: #ffd23f; padding: 12px 14px 8px; }
+.ob-stops { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 10px 10px; display: flex; flex-direction: column; gap: 8px; }
+
+/* travel wipe between stops */
+.traveling-wipe { position: absolute; inset: 0; z-index: 150; display: flex; align-items: center; justify-content: center;
+  background: rgba(5,6,9,0.82); animation: fadeIn 0.2s ease; }
+.tw-streaks { position: absolute; inset: 0; opacity: 0.5;
+  background: repeating-linear-gradient(100deg, transparent 0 26px, rgba(255,210,63,0.16) 26px 30px, transparent 30px 60px);
+  animation: streak 0.5s linear infinite; }
+@keyframes streak { from { background-position: 0 0; } to { background-position: -240px 0; } }
+.tw-text { position: relative; font-family: var(--display); font-size: 26px; letter-spacing: 0.06em; text-transform: uppercase; color: #fff; }
+
+@media (prefers-reduced-motion: reduce) {
+  .arrival-card, .platform-board, .tw-streaks, .ac-dot, .traveling-wipe { animation: none !important; }
+}

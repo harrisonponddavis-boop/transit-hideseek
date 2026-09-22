@@ -7,7 +7,7 @@ const { getCity, listCities } = require('./stations');
 const {
   createGame, setOptions, setHider, move, walk, ask, guess, photoReply, viewFor, PHOTO_KINDS,
   board, disembark,
-  createSoloGame, placeSoloHider, soloPhoto, matchCategoriesFor,
+  createSoloGame, placeSoloHider, soloPhoto, matchCategoriesFor, earnStudy,
 } = require('./game');
 
 const STREET_VIEW_KEY = process.env.GOOGLE_MAPS_KEY || '';
@@ -89,16 +89,27 @@ io.on('connection', (socket) => {
     broadcast(g);
   });
 
-  socket.on('createSolo', async ({ name, cityId }, cb) => {
+  socket.on('createSolo', async ({ name, cityId, study }, cb) => {
     if (games.size >= MAX_ROOMS) return cb({ error: 'Server is full — try again in a bit' });
     playerId = socket.id;
     socketsByPlayer.set(playerId, socket);
-    const g = createSoloGame(playerId, (name || 'Seeker').slice(0, 20), !!STREET_VIEW_KEY, cityId);
+    const g = createSoloGame(playerId, (name || 'Seeker').slice(0, 20), !!STREET_VIEW_KEY, cityId, !!study);
     games.set(g.code, g);
     gameCode = g.code;
     await placeSoloHider(g, STREET_VIEW_KEY);
     cb({ ok: true, code: g.code });
     broadcast(g);
+  });
+
+  socket.on('earnStudy', (_data, cb) => {
+    const g = game();
+    if (!g) return cb?.(GONE);
+    if (g.phase !== 'seeking') return cb?.({ error: 'The game is not in the seeking phase' });
+    const me = g.players.find((p) => p.id === playerId);
+    if (me?.role !== 'seeker') return cb?.({ error: 'Only seekers earn study coins' });
+    const r = earnStudy(g);
+    cb?.(r);
+    if (r.ok) broadcast(g);
   });
 
   socket.on('join', ({ code, name }, cb) => {

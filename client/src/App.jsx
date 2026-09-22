@@ -5,6 +5,7 @@ import MapView from './MapView';
 import StreetViewPanel from './StreetViewPanel';
 import MiniMap from './MiniMap';
 import ImmersiveView from './ImmersiveView';
+import { loadStudyQuestions, saveStudyQuestions } from './study';
 
 const RADAR_OPTIONS = [
   { km: 0.5, cost: 5 },
@@ -113,6 +114,7 @@ function Home({ flash }) {
   const [showHelp, setShowHelp] = useState(() => {
     try { return !localStorage.getItem('ths-seen-help'); } catch { return false; }
   });
+  const [showStudy, setShowStudy] = useState(false);
   const closeHelp = () => {
     setShowHelp(false);
     try { localStorage.setItem('ths-seen-help', '1'); } catch { /* ignore */ }
@@ -160,9 +162,13 @@ function Home({ flash }) {
         <button className="ghost" style={{ width: '100%', marginTop: 10 }} onClick={() => go('createSolo', { name, cityId })}>
           Hunt the Phantom (solo)
         </button>
-        <button className="ghost small" style={{ width: '100%', marginTop: 10 }} onClick={() => setShowHelp(true)}>
-          ？ How to play
+        <button className="ghost" style={{ width: '100%', marginTop: 10 }} onClick={() => go('createSolo', { name, cityId, study: true })}>
+          📝 Study mode (solo)
         </button>
+        <div className="row" style={{ marginTop: 10 }}>
+          <button className="ghost small" onClick={() => setShowHelp(true)}>？ How to play</button>
+          <button className="ghost small" onClick={() => setShowStudy(true)}>Edit study questions</button>
+        </div>
         <div className="divider">or join one</div>
         <div className="row">
           <input
@@ -174,6 +180,59 @@ function Home({ flash }) {
         </div>
       </div>
       {showHelp && <HowToPlay onClose={closeHelp} />}
+      {showStudy && <StudyEditor onClose={() => setShowStudy(false)} />}
+    </div>
+  );
+}
+
+// Author your own multiple-choice questions for study mode (saved in the browser).
+function StudyEditor({ onClose }) {
+  const [questions, setQuestions] = useState(() => loadStudyQuestions());
+  const [q, setQ] = useState('');
+  const [opts, setOpts] = useState(['', '', '', '']);
+  const [correct, setCorrect] = useState(0);
+
+  const persist = (next) => { setQuestions(next); saveStudyQuestions(next); };
+  const add = () => {
+    const cleanOpts = opts.map((o) => o.trim()).filter(Boolean);
+    if (!q.trim() || cleanOpts.length < 2) return;
+    const c = Math.min(correct, cleanOpts.length - 1);
+    persist([...questions, { id: Date.now(), q: q.trim(), options: cleanOpts, correct: c }]);
+    setQ(''); setOpts(['', '', '', '']); setCorrect(0);
+  };
+  const remove = (id) => persist(questions.filter((x) => x.id !== id));
+
+  return (
+    <div className="help-overlay" onClick={onClose}>
+      <div className="study-card" onClick={(e) => e.stopPropagation()}>
+        <h3 className="help-title" style={{ fontSize: 24 }}>Study questions</h3>
+        <p className="hint" style={{ marginBottom: 14 }}>
+          Write your own multiple-choice questions. In study mode you earn coins by answering them right —
+          riding is free. Saved on this device.
+        </p>
+        <div className="study-list">
+          {questions.length === 0 && <p className="hint">No questions yet — add your first below.</p>}
+          {questions.map((x) => (
+            <div className="study-q" key={x.id}>
+              <div className="sq-text"><b>{x.q}</b><span> · answer: {x.options[x.correct]}</span></div>
+              <button className="ghost small" onClick={() => remove(x.id)}>✕</button>
+            </div>
+          ))}
+        </div>
+        <div className="study-form">
+          <input type="text" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Question…" />
+          {opts.map((o, n) => (
+            <div className="study-opt" key={n}>
+              <button className={`sq-mark ${correct === n ? 'on' : ''}`} title="Mark correct"
+                onClick={() => setCorrect(n)}>{correct === n ? '✓' : ''}</button>
+              <input type="text" value={o} placeholder={`Option ${n + 1}${n > 1 ? ' (optional)' : ''}`}
+                onChange={(e) => setOpts(opts.map((v, i) => (i === n ? e.target.value : v)))} />
+            </div>
+          ))}
+          <button className="small" style={{ width: '100%', marginTop: 6 }} onClick={add}>Add question</button>
+        </div>
+        <button className="ghost small" style={{ width: '100%', marginTop: 12 }} onClick={onClose}>Done</button>
+      </div>
     </div>
   );
 }

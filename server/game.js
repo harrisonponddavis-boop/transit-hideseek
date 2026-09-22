@@ -21,6 +21,7 @@ const RULES = {
   WIN_RADIUS_OPTIONS: [10, 15, 25, 50], // host picks one in the lobby
   MAX_BUS_WAIT_MINS: 10,    // next-bus wait is a random 1..this, added on ride
   ENDGAME_BONUS_FLAT: 22,   // confirming the zone tops you up by at least this
+  STUDY_REWARD: 4,          // coins for a correct answer in study mode
 };
 
 const QUESTION_DEFS = {
@@ -165,14 +166,23 @@ function hiderDistFrom(game, pos) {
 
 // --- Solo mode: an AI hider ("The Phantom") picks a spot and sends one photo ---
 
-function createSoloGame(hostId, hostName, photoAvailable, cityId = DEFAULT_CITY) {
+function createSoloGame(hostId, hostName, photoAvailable, cityId = DEFAULT_CITY, study = false) {
   const g = createGame(hostId, hostName, cityId);
   g.solo = true;
+  g.study = !!study; // study mode: riding pays nothing; you earn coins by quizzing yourself
   g.photoAvailable = !!photoAvailable;
   g.photoUsed = false;
   g.players[0].role = 'seeker';
   g.players.push({ id: SOLO.BOT_ID, name: SOLO.BOT_NAME, role: 'hider' });
   return g;
+}
+
+// Study mode: reward for answering one of your own quiz questions correctly.
+function earnStudy(game) {
+  if (!game.study) return { error: 'Not a study game' };
+  game.coins += RULES.STUDY_REWARD;
+  game.feed.push({ kind: 'system', clock: game.clock, text: `Answered a study question — +${RULES.STUDY_REWARD} coins.` });
+  return { ok: true, coins: game.coins };
 }
 
 // Random station weighted by distance from the start (farther = likelier),
@@ -366,7 +376,7 @@ function disembark(game, toStationId) {
     return { ok: true };
   }
   const rideMins = alongLineMins(line, from, toStationId);
-  const earned = rideCoins(rideMins);
+  const earned = game.study ? 0 : rideCoins(rideMins);
   game.clock += rideMins;
   game.coins += earned;
   game.seekerStation = toStationId;
@@ -388,7 +398,7 @@ function move(game, toStationId) {
   const walkBack = game.walkPos ? walkMinutes(game.walkPos, city.stations[game.seekerStation]) : 0;
   const waitMins = busWait(game, toStationId); // time spent waiting for the next bus
   const mins = rideMins + walkBack + waitMins;
-  const earned = rideCoins(rideMins);
+  const earned = game.study ? 0 : rideCoins(rideMins);
   game.clock += mins;
   game.coins += earned;
   game.feed.push({
@@ -407,7 +417,7 @@ function walk(game, lat, lng) {
   if (meters > RULES.MAX_WALK_METERS)
     return { error: `Too far to walk in one go (${Math.round(meters)}m, max ${RULES.MAX_WALK_METERS}m) — ride instead` };
   const mins = walkMinutes(pos, { lat, lng });
-  const earned = Math.max(1, Math.round(mins * RULES.WALK_COIN_RATE));
+  const earned = game.study ? 0 : Math.max(1, Math.round(mins * RULES.WALK_COIN_RATE));
   game.clock += mins;
   game.coins += earned;
   game.walkPos = { lat, lng };
@@ -605,6 +615,7 @@ function viewFor(game, playerId) {
     feed: game.feed,
     pendingPhoto: game.pendingPhoto,
     solo: game.solo || false,
+    study: game.study || false,
     photoAvailable: game.photoAvailable || false,
     photoUsed: game.photoUsed || false,
     winner: game.winner,
@@ -631,5 +642,5 @@ module.exports = {
   RULES, QUESTION_DEFS, PHOTO_KINDS, SOLO, MATCH_CATEGORIES, matchCategoriesFor,
   createGame, setOptions, setHider, move, walk, ask, guess, photoReply, viewFor,
   board, disembark, linesAt, alongLineMins,
-  createSoloGame, placeSoloHider, soloPhoto, pickSoloSpot,
+  createSoloGame, placeSoloHider, soloPhoto, pickSoloSpot, earnStudy,
 };

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { loadGoogleMaps } from './maps-loader';
 import { isPointPossible, possibleStations, geoConstraints, metersBetween, bearingBetween } from './solver';
+import { loadStudyQuestions } from './study';
 import MapView from './MapView';
 
 const RADARS = [{ km: 0.5, c: 5 }, { km: 1, c: 4 }, { km: 2, c: 3 }, { km: 5, c: 2 }];
@@ -232,11 +233,12 @@ export default function ImmersiveView({ state, network, act, embedKey, onExit })
                   </span>
                 </div>
                 <div className="phone-screen">
-                  {app === 'home' && <PhoneHome vehicle={vehicle} onOpen={openApp} />}
+                  {app === 'home' && <PhoneHome vehicle={vehicle} study={state.study} onOpen={openApp} />}
                   {app === 'bus' && <BusApp state={state} network={network} act={actRef.current}
                     nearStop={nearStop} distFromStop={distFromStop} onReturn={() => { returnToStop(); }} onBoarded={closePhone} />}
                   {app === 'texts' && <TextsApp state={state} network={network} act={actRef.current}
                     hiderName={hiderName} onOpenPhoto={(img) => setLightbox(img)} />}
+                  {app === 'study' && <StudyApp act={actRef.current} />}
                 </div>
                 <button className="phone-homebar" onClick={goHome} title="Back to home screen">
                   <span className="hb-btn">⌂ Home</span>
@@ -264,7 +266,7 @@ export default function ImmersiveView({ state, network, act, embedKey, onExit })
   );
 }
 
-function PhoneHome({ vehicle, onOpen }) {
+function PhoneHome({ vehicle, study, onOpen }) {
   const transitLabel = vehicle === 'bus' ? 'Bus' : 'Train';
   return (
     <div className="home-screen">
@@ -282,8 +284,71 @@ function PhoneHome({ vehicle, onOpen }) {
           <span className="ai-glyph texts">💬</span>
           <span className="ai-name">Texts</span>
         </button>
+        {study && (
+          <button className="app-icon" onClick={() => onOpen('study')}>
+            <span className="ai-glyph study">📝</span>
+            <span className="ai-name">Study</span>
+          </button>
+        )}
       </div>
-      <p className="home-hint">Catch a {vehicle} at the stop, plan on the map, text the hider.</p>
+      <p className="home-hint">
+        {study
+          ? `Answer your study questions to earn coins — riding is free in study mode.`
+          : `Catch a ${vehicle} at the stop, plan on the map, text the hider.`}
+      </p>
+    </div>
+  );
+}
+
+// Study mode: answer your own multiple-choice questions to earn coins.
+function StudyApp({ act }) {
+  const questions = useMemo(() => loadStudyQuestions(), []);
+  const pick = () => (questions.length ? Math.floor(Math.random() * questions.length) : -1);
+  const [idx, setIdx] = useState(pick);
+  const [chosen, setChosen] = useState(null); // index picked this round
+  const q = idx >= 0 ? questions[idx] : null;
+  const correct = chosen !== null && q && chosen === q.correct;
+
+  const answer = (n) => {
+    if (chosen !== null) return;
+    setChosen(n);
+    if (q && n === q.correct) act('earnStudy', {});
+  };
+  const next = () => { setChosen(null); setIdx(pick()); };
+
+  if (!q) {
+    return (
+      <div className="app-view study-app">
+        <div className="app-bar"><span className="ab-title">📝 Study</span></div>
+        <div className="board-gate">
+          <div className="bg-icon">📝</div>
+          <p className="bg-text">No study questions yet.<br />Add your own from the home screen (“Edit study questions”) before playing study mode.</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="app-view study-app">
+      <div className="app-bar"><span className="ab-title">📝 Study</span></div>
+      <div className="app-sub">Answer right to earn coins</div>
+      <div className="study-quiz">
+        <div className="sq-question">{q.q}</div>
+        <div className="sq-options">
+          {q.options.map((o, n) => {
+            const state = chosen === null ? '' : n === q.correct ? 'right' : n === chosen ? 'wrong' : '';
+            return (
+              <button key={n} className={`sq-opt ${state}`} disabled={chosen !== null} onClick={() => answer(n)}>{o}</button>
+            );
+          })}
+        </div>
+        {chosen !== null && (
+          <div className={`sq-result ${correct ? 'ok' : 'no'}`}>
+            {correct ? '✓ Correct! +4 coins' : `✗ Not quite — it's “${q.options[q.correct]}”`}
+            <button className="small" style={{ marginLeft: 10 }} onClick={next}>Next question</button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

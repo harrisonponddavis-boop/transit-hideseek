@@ -544,10 +544,13 @@ a { color: var(--amber); }
 .ps-batt::after { content: ''; position: absolute; inset: 2px; right: 6px; background: var(--amber); border-radius: 1px; }
 .phone-screen { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
 .phone-homebar {
-  height: 26px; display: grid; place-items: center; background: transparent; border: none; cursor: pointer;
+  height: 42px; display: grid; place-items: center; background: transparent; border: none; cursor: pointer; flex: none;
 }
-.phone-homebar .hb { width: 120px; height: 5px; border-radius: 3px; background: #3a4150; }
-.phone-homebar:hover .hb { background: var(--amber); }
+.hb-btn { font-family: var(--display); font-size: 14px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+  color: #ffd23f; background: rgba(255,210,63,0.14); border: 1px solid rgba(255,210,63,0.5); border-radius: 20px; padding: 6px 20px; }
+.phone-homebar:hover .hb-btn { background: #ffd23f; color: #0b0d11; }
+.phone.light .hb-btn { color: #9a6a06; background: rgba(255,210,63,0.22); border-color: #e6cd93; }
+.phone.light .phone-homebar:hover .hb-btn { background: #ffd23f; color: #0b0d11; }
 
 /* home screen */
 .home-screen { flex: 1; display: flex; flex-direction: column; padding: 24px 22px; text-align: center;
@@ -950,3 +953,25 @@ a { color: var(--amber); }
 @media (prefers-reduced-motion: reduce) {
   .arrival-card, .platform-board, .tw-streaks, .ac-dot, .traveling-wipe { animation: none !important; }
 }
+
+/* ---- highlighted boarding zone prompt ---- */
+.board-prompt { position: absolute; left: 50%; bottom: 92px; transform: translateX(-50%); z-index: 35;
+  display: flex; flex-direction: column; align-items: center; gap: 6px; background: none; border: none; cursor: pointer; }
+.bp-ring { position: absolute; bottom: 28px; width: 52px; height: 52px; border-radius: 50%; border: 3px solid #ffd23f;
+  animation: smpulse 1.8s ease-out infinite; }
+@keyframes smpulse { 0% { transform: scale(0.7); opacity: 0.9; } 100% { transform: scale(1.9); opacity: 0; } }
+.bp-icon { font-size: 34px; filter: drop-shadow(0 2px 6px rgba(0,0,0,0.75)); }
+.bp-label { font-family: var(--display); font-size: 15px; letter-spacing: 0.05em; text-transform: uppercase; color: #0b0d11;
+  background: #ffd23f; padding: 6px 15px; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.5); }
+.board-prompt:hover .bp-label { filter: brightness(1.06); }
+
+/* ---- ask-from-map bar ---- */
+.maps-askbar { position: absolute; left: 50%; bottom: 120px; transform: translateX(-50%); z-index: 1300;
+  display: flex; align-items: center; gap: 12px; background: rgba(10,12,17,0.96); border: 1px solid #2a3140;
+  border-radius: 12px; padding: 10px 14px; font-family: var(--mono); font-size: 13px; color: #dfe3ea; max-width: 94vw; }
+.maps-askbar b { color: #ffd23f; }
+
+/* ---- "you are here" map dot label ---- */
+.leaflet-tooltip.you-tip { background: #ffd23f; color: #0b0d11; border: none; border-radius: 4px;
+  font-family: var(--mono); font-size: 10px; font-weight: 700; padding: 1px 6px; box-shadow: 0 2px 6px rgba(0,0,0,0.45); }
+.leaflet-tooltip.you-tip::before { border-top-color: #ffd23f; }

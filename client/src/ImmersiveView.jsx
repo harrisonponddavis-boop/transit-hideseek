@@ -24,7 +24,7 @@ export default function ImmersiveView({ state, network, act, embedKey, onExit })
   const [phoneOpen, setPhoneOpen] = useState(false);
   const [app, setApp] = useState('home'); // 'home' | 'bus' | 'maps' | 'texts'
   const [phoneTheme, setPhoneTheme] = useState(() => {
-    try { return localStorage.getItem('ths-phone-theme') || 'dark'; } catch { return 'dark'; }
+    try { return localStorage.getItem('ths-phone-theme') || 'light'; } catch { return 'light'; }
   });
   const [lightbox, setLightbox] = useState(null);
   const [busScene, setBusScene] = useState(false); // fullscreen "at the stop" boarding scene
@@ -46,10 +46,17 @@ export default function ImmersiveView({ state, network, act, embedKey, onExit })
     if (!pano) return;
     if (!svc) { pano.setPosition({ lat: loc.lat, lng: loc.lng }); return; }
     const source = window.google?.maps?.StreetViewSource?.OUTDOOR;
-    svc.getPanorama({ location: { lat: loc.lat, lng: loc.lng }, radius: 240, ...(source ? { source } : {}) }, (data, status) => {
-      if (status === 'OK' && data?.location?.pano) pano.setPano(data.location.pano);
-      else pano.setPosition({ lat: loc.lat, lng: loc.lng });
-    });
+    const tryRadius = (radius, next) => svc.getPanorama(
+      { location: { lat: loc.lat, lng: loc.lng }, radius, ...(source ? { source } : {}) },
+      (data, status) => {
+        if (status === 'OK' && data?.location?.pano) pano.setPano(data.location.pano);
+        else if (next) next();
+        else pano.setPosition({ lat: loc.lat, lng: loc.lng });
+      }
+    );
+    // prefer the CLOSEST outdoor road pano so you land right at the stop, not a
+    // random spot far off; widen the search only if nothing is close.
+    tryRadius(90, () => tryRadius(400));
   };
 
   useEffect(() => {
@@ -182,6 +189,15 @@ export default function ImmersiveView({ state, network, act, embedKey, onExit })
                 </button>
               )}
 
+              {/* highlight the boarding zone: you're at the stop — tap to board */}
+              {nearStop && !phoneOpen && (
+                <button className="board-prompt" onClick={() => openApp('bus')} title="Catch your ride">
+                  <span className="bp-ring" />
+                  <span className="bp-icon">{vehicle === 'bus' ? '🚏' : '🚉'}</span>
+                  <span className="bp-label">You're at the {vehicle === 'bus' ? 'bus stop' : 'platform'} — tap to board</span>
+                </button>
+              )}
+
               <div className="imm-sv-controls">
                 <button className="sv-btn ghost" onClick={walkHere} title="Move your standing point to here">Walk here</button>
                 <button className="sv-btn" onClick={dropPin} title="Walk here and tag the hider">📍 Drop pin</button>
@@ -220,7 +236,9 @@ export default function ImmersiveView({ state, network, act, embedKey, onExit })
                   {app === 'texts' && <TextsApp state={state} network={network} act={actRef.current}
                     hiderName={hiderName} onOpenPhoto={(img) => setLightbox(img)} />}
                 </div>
-                <button className="phone-homebar" onClick={goHome} title="Home"><span className="hb" /></button>
+                <button className="phone-homebar" onClick={goHome} title="Back to home screen">
+                  <span className="hb-btn">⌂ Home</span>
+                </button>
               </div>
             </div>
           )}
@@ -435,6 +453,7 @@ function MapsApp({ network, state, theme, act, onBack }) {
   const [sel, setSel] = useState(null);
   const [pendingWalk, setPendingWalk] = useState(null);
   const [walkMsg, setWalkMsg] = useState(null);
+  const [asking, setAsking] = useState(false);
   const guesses = state.feed.filter((f) => f.kind === 'guess' && f.lat);
   const radarHistory = state.feed
     .filter((f) => f.type === 'radar' && f.center)
@@ -459,6 +478,13 @@ function MapsApp({ network, state, theme, act, onBack }) {
     setPendingWalk({ lat, lng, mins: Math.max(1, Math.ceil((d / 1000) * state.rules.WALK_PACE_MIN_PER_KM)), meters: Math.round(d) });
   };
   const doWalk = async () => { const p = pendingWalk; setPendingWalk(null); await act('walk', { lat: p.lat, lng: p.lng }); };
+  const askFromMap = async () => {
+    if (!active?.ask) return;
+    setAsking(true);
+    await act('ask', active.ask);
+    setAsking(false);
+    setSel(null);
+  };
 
   return (
     <div className="maps-fullscreen">
@@ -485,6 +511,15 @@ function MapsApp({ network, state, theme, act, onBack }) {
         </span>
       </div>
       <MapLegend lines={network?.lines || []} />
+      {active?.ask && !pendingWalk && (
+        <div className="maps-askbar">
+          <span>Preview of <b>{active.label}</b> — ask the hider for real?</span>
+          <button className="mw-cancel" onClick={() => setSel(null)}>Just looking</button>
+          <button className="mw-go" disabled={state.coins < active.cost || asking} onClick={askFromMap}>
+            {asking ? 'Asking…' : `Ask · ${active.cost}🪙`}
+          </button>
+        </div>
+      )}
       {pendingWalk && (
         <div className="maps-walkbar">
           <span>Walk <b>{pendingWalk.meters}m</b> here · ~{pendingWalk.mins} min</span>
@@ -661,20 +696,21 @@ function StopBoarding({ state, network, onBoard, onCancel }) {
 
 function previewTools(network) {
   const t = [
-    { key: 'r05', label: 'Radar 0.5km', pv: { type: 'radar', radiusKm: 0.5 }, hint: 'Radar 0.5km — the hider is inside or outside this ring.' },
-    { key: 'r1', label: 'Radar 1km', pv: { type: 'radar', radiusKm: 1 }, hint: 'Radar 1km — the hider is inside or outside this ring.' },
-    { key: 'r2', label: 'Radar 2km', pv: { type: 'radar', radiusKm: 2 }, hint: 'Radar 2km — the hider is inside or outside this ring.' },
-    { key: 'r5', label: 'Radar 5km', pv: { type: 'radar', radiusKm: 5 }, hint: 'Radar 5km — the hider is inside or outside this ring.' },
-    { key: 'cns', label: 'Compass N/S', pv: { type: 'compass', axis: 'ns' }, hint: 'Compass N/S — splits the map north vs south of you.' },
-    { key: 'cew', label: 'Compass E/W', pv: { type: 'compass', axis: 'ew' }, hint: 'Compass E/W — splits the map east vs west of you.' },
-    { key: 'line', label: 'Same line', pv: { type: 'lines' }, hint: 'Same line — highlights every station sharing a line with you.' },
-    { key: 'stn', label: 'Right station', pv: { type: 'station' }, hint: 'Right station — is your current station the hider’s home?' },
+    { key: 'r05', label: 'Radar 0.5km', pv: { type: 'radar', radiusKm: 0.5 }, ask: { type: 'radar', params: { radiusKm: 0.5 } }, cost: 5, hint: 'Radar 0.5km — the hider is inside or outside this ring.' },
+    { key: 'r1', label: 'Radar 1km', pv: { type: 'radar', radiusKm: 1 }, ask: { type: 'radar', params: { radiusKm: 1 } }, cost: 4, hint: 'Radar 1km — the hider is inside or outside this ring.' },
+    { key: 'r2', label: 'Radar 2km', pv: { type: 'radar', radiusKm: 2 }, ask: { type: 'radar', params: { radiusKm: 2 } }, cost: 3, hint: 'Radar 2km — the hider is inside or outside this ring.' },
+    { key: 'r5', label: 'Radar 5km', pv: { type: 'radar', radiusKm: 5 }, ask: { type: 'radar', params: { radiusKm: 5 } }, cost: 2, hint: 'Radar 5km — the hider is inside or outside this ring.' },
+    { key: 'cns', label: 'Compass N/S', pv: { type: 'compass', axis: 'ns' }, ask: { type: 'compass', params: { axis: 'ns' } }, cost: 5, hint: 'Compass N/S — splits the map north vs south of you.' },
+    { key: 'cew', label: 'Compass E/W', pv: { type: 'compass', axis: 'ew' }, ask: { type: 'compass', params: { axis: 'ew' } }, cost: 5, hint: 'Compass E/W — splits the map east vs west of you.' },
+    { key: 'line', label: 'Same line', pv: { type: 'lines' }, ask: { type: 'sameLine' }, cost: 3, hint: 'Same line — highlights every station sharing a line with you.' },
+    { key: 'stn', label: 'Right station', pv: { type: 'station' }, ask: { type: 'rightStation' }, cost: 4, hint: 'Right station — is your current station the hider’s home?' },
   ];
   (network?.matchCategories || []).forEach((c) =>
     t.push({ key: `m${c.id}`, label: c.region ? `Same ${c.label}` : `Near ${c.label}`, pv: { type: 'match', category: c.id, region: !!c.region },
+      ask: { type: 'matching', params: { category: c.id } }, cost: c.cost,
       hint: c.region ? `Same ${c.label} — lights up every station in your ${c.label}.` : `Nearest ${c.label} — splits the map by closest ${c.label}.` }));
-  t.push({ key: 'r100', label: 'Radar 100m', pv: { type: 'radar', radiusKm: 0.1 }, hint: 'Radar 100m — endgame ring right around you.' });
-  t.push({ key: 'r250', label: 'Radar 250m', pv: { type: 'radar', radiusKm: 0.25 }, hint: 'Radar 250m — endgame ring around you.' });
+  t.push({ key: 'r100', label: 'Radar 100m', pv: { type: 'radar', radiusKm: 0.1 }, ask: { type: 'radar', params: { radiusKm: 0.1 } }, cost: 7, hint: 'Radar 100m — endgame ring right around you.' });
+  t.push({ key: 'r250', label: 'Radar 250m', pv: { type: 'radar', radiusKm: 0.25 }, ask: { type: 'radar', params: { radiusKm: 0.25 } }, cost: 6, hint: 'Radar 250m — endgame ring around you.' });
   return t;
 }
 

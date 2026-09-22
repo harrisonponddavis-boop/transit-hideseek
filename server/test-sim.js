@@ -191,11 +191,11 @@ console.log('✓ question refused when out of coins');
 g.coins = 10;
 r = ask(g, 'rightStation');
 assert(r.answer.startsWith('YES'), `expected YES, got ${r.answer}`);
-assert.strictEqual(g.coins, (10 - 4) * 3, 'coins should triple after zone confirmation');
+assert.strictEqual(g.coins, Math.max((10 - 4) * 3, (10 - 4) + RULES.ENDGAME_BONUS_FLAT), 'coins get the endgame boost (3x or a flat floor)');
 assert(g.endgameBonus);
 assert(g.stationConfirmed, 'Right Station YES unlocks Street View');
 assert(viewFor(g, 'S1').stationConfirmed === true);
-assert(g.feed.some((f) => f.text?.includes('tripled')), 'bonus message in feed');
+assert(g.feed.some((f) => f.text?.includes('topped up')), 'bonus message in feed');
 console.log('✓ right station: YES triples coins once + unlocks Street View');
 
 // compass: hider is north of Castro station

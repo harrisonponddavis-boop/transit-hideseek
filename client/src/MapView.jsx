@@ -341,15 +341,22 @@ export default function MapView({
       }).bindTooltip(g.hit ? 'FOUND HERE' : 'wrong guess'));
     }
 
-    // seekers on foot: dashed tether from station + a solid amber dot
+    // seekers on foot: dashed tether from station to where they walked
     if (walkPos && seekerStation && network.stations[seekerStation]) {
       const s = network.stations[seekerStation];
       dl.addLayer(L.polyline([[s.lat, s.lng], [walkPos.lat, walkPos.lng]], {
         color: '#ffb000', dashArray: '4 7', weight: 2, opacity: 0.8, ...passive,
       }));
-      dl.addLayer(L.circleMarker([walkPos.lat, walkPos.lng], {
-        radius: 7, color: '#ffb000', weight: 3, fillColor: '#ffb000', fillOpacity: 0.55, ...passive,
+    }
+    // the seeker's live "you are here" dot — always at the real standing position
+    // (station or walked), so it visibly moves as you travel around the map
+    if (seekerPos) {
+      dl.addLayer(L.circle([seekerPos.lat, seekerPos.lng], {
+        radius: 40, color: '#ffd23f', weight: 1, fillColor: '#ffd23f', fillOpacity: 0.18, ...passive,
       }));
+      dl.addLayer(L.circleMarker([seekerPos.lat, seekerPos.lng], {
+        radius: 8, color: '#0b0d11', weight: 3, fillColor: '#ffd23f', fillOpacity: 1, ...passive,
+      }).bindTooltip('<b>YOU</b>', { permanent: true, direction: 'top', offset: [0, -8], className: 'you-tip' }));
     }
 
     // pin reach while in guess mode

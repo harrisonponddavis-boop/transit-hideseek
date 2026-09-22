@@ -12,14 +12,15 @@ const RULES = {
   CLOSE_RADIUS_METERS: 100, // wrong guesses inside this get a "close" hint
   WRONG_GUESS_PENALTY_MINS: 10,
   STARTING_COINS: 15,
-  RIDE_COIN_RATE: 0.5,  // coins earned per minute of riding (longer trips pay more)
-  MIN_RIDE_COINS: 2,    // even a one-stop hop is worth this much
-  COINS_PER_WALK: 1,
+  RIDE_COIN_RATE: 0.6,  // coins earned per minute of riding (longer trips pay more)
+  MIN_RIDE_COINS: 3,    // even a one-stop hop is worth this much
+  WALK_COIN_RATE: 1.2,  // coins per minute of walking — moving around pays too
   WALK_PACE_MIN_PER_KM: 12, // ~5 km/h
   MAX_WALK_METERS: 1500,    // per walking leg
   GUESS_RANGE_METERS: 50,   // pins must be dropped this close to where you stand
   WIN_RADIUS_OPTIONS: [10, 15, 25, 50], // host picks one in the lobby
   MAX_BUS_WAIT_MINS: 10,    // next-bus wait is a random 1..this, added on ride
+  ENDGAME_BONUS_FLAT: 22,   // confirming the zone tops you up by at least this
 };
 
 const QUESTION_DEFS = {
@@ -406,12 +407,13 @@ function walk(game, lat, lng) {
   if (meters > RULES.MAX_WALK_METERS)
     return { error: `Too far to walk in one go (${Math.round(meters)}m, max ${RULES.MAX_WALK_METERS}m) — ride instead` };
   const mins = walkMinutes(pos, { lat, lng });
+  const earned = Math.max(1, Math.round(mins * RULES.WALK_COIN_RATE));
   game.clock += mins;
-  game.coins += RULES.COINS_PER_WALK;
+  game.coins += earned;
   game.walkPos = { lat, lng };
   game.feed.push({
     kind: 'walk', clock: game.clock, lat, lng, mins,
-    text: `Seekers walked ${Math.round(meters)}m ${posLabel(game)} (${mins} min, +${RULES.COINS_PER_WALK} coin)`,
+    text: `Seekers walked ${Math.round(meters)}m ${posLabel(game)} (${mins} min, +${earned} coins)`,
   });
   return { ok: true };
 }
@@ -530,10 +532,12 @@ function ask(game, type, params = {}) {
     (type === 'radar' && Number(params.radiusKm) <= 0.25 && answer.startsWith('YES'));
   if (!game.endgameBonus && confirmedZone) {
     game.endgameBonus = true;
-    game.coins *= 3;
+    // triple the purse, but always top it up by at least a flat amount so a
+    // near-empty wallet still gets a real endgame boost (3× of 1 is only 3).
+    game.coins = Math.max(game.coins * 3, game.coins + RULES.ENDGAME_BONUS_FLAT);
     game.feed.push({
       kind: 'system', clock: game.clock,
-      text: `ZONE CONFIRMED — endgame bonus! Coins tripled to ${game.coins}.`,
+      text: `ZONE CONFIRMED — endgame boost! Coins topped up to ${game.coins}.`,
     });
   }
   return { ok: true, answer };

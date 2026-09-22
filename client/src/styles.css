@@ -975,3 +975,18 @@ a { color: var(--amber); }
 .leaflet-tooltip.you-tip { background: #ffd23f; color: #0b0d11; border: none; border-radius: 4px;
   font-family: var(--mono); font-size: 10px; font-weight: 700; padding: 1px 6px; box-shadow: 0 2px 6px rgba(0,0,0,0.45); }
 .leaflet-tooltip.you-tip::before { border-top-color: #ffd23f; }
+
+/* ================= how-to-play tutorial ================= */
+.help-overlay { position: fixed; inset: 0; z-index: 4000; display: grid; place-items: center;
+  background: rgba(5,6,9,0.82); backdrop-filter: blur(3px); animation: fadeIn 0.2s ease; padding: 20px; }
+.help-card { width: min(440px, 94vw); background: var(--panel); border: 1px solid var(--edge); border-top: 3px solid var(--amber);
+  border-radius: 6px; padding: 30px 28px 22px; text-align: center; box-shadow: 0 24px 70px rgba(0,0,0,0.6);
+  animation: cardUp 0.3s cubic-bezier(0.2,0.8,0.2,1); }
+.help-icon { font-size: 52px; line-height: 1; margin-bottom: 12px; }
+.help-title { font-family: var(--display); font-size: 28px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--bone); margin-bottom: 10px; }
+.help-body { font-family: var(--mono); font-size: 13.5px; line-height: 1.65; color: var(--muted); min-height: 116px; }
+.help-dots { display: flex; gap: 8px; justify-content: center; margin: 16px 0 18px; }
+.help-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--edge); cursor: pointer; transition: background 0.15s, transform 0.15s; }
+.help-dot.on { background: var(--amber); transform: scale(1.2); }
+.help-actions { display: flex; gap: 10px; justify-content: center; }
+.help-actions button { min-width: 78px; }

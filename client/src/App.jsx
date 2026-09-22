@@ -110,6 +110,13 @@ function Home({ flash }) {
   const [code, setCode] = useState('');
   const [cities, setCities] = useState([]);
   const [cityId, setCityId] = useState('sf');
+  const [showHelp, setShowHelp] = useState(() => {
+    try { return !localStorage.getItem('ths-seen-help'); } catch { return false; }
+  });
+  const closeHelp = () => {
+    setShowHelp(false);
+    try { localStorage.setItem('ths-seen-help', '1'); } catch { /* ignore */ }
+  };
 
   useEffect(() => {
     fetch('/cities').then((r) => r.json()).then((list) => {
@@ -153,6 +160,9 @@ function Home({ flash }) {
         <button className="ghost" style={{ width: '100%', marginTop: 10 }} onClick={() => go('createSolo', { name, cityId })}>
           Hunt the Phantom (solo)
         </button>
+        <button className="ghost small" style={{ width: '100%', marginTop: 10 }} onClick={() => setShowHelp(true)}>
+          ？ How to play
+        </button>
         <div className="divider">or join one</div>
         <div className="row">
           <input
@@ -161,6 +171,38 @@ function Home({ flash }) {
             style={{ letterSpacing: '0.3em', textTransform: 'uppercase' }}
           />
           <button className="ghost" onClick={() => go('join', { code, name })}>Join</button>
+        </div>
+      </div>
+      {showHelp && <HowToPlay onClose={closeHelp} />}
+    </div>
+  );
+}
+
+const HELP_STEPS = [
+  { icon: '🎯', title: 'The goal', body: 'Someone is hiding within a few hundred metres of a transit station. You’re the seeker — track them down and drop a pin within metres of their exact spot to win.' },
+  { icon: '🚏', title: 'Ride the transit', body: 'You start at a station in real Street View. Tap the highlighted stop to catch a bus or train, hop on, and tell the driver which stop you want — real travel times apply.' },
+  { icon: '📱', title: 'Your field phone', body: 'Open the phone (bottom-right) for three apps: Transit to travel, Maps to plan and see what you’ve ruled out, and Texts to ask the hider questions — they answer from their true location and can’t lie.' },
+  { icon: '🪙', title: 'Coins & questions', body: 'You earn coins by riding and walking, and spend them on questions — radar rings, a compass, “same line?”, photos, and more. Each answer greys out part of the map.' },
+  { icon: '📍', title: 'The endgame', body: 'Once you’ve found the hider’s station, you switch to a Street View hunt with their photo and a live map beside you. Walk to the exact spot and drop your pin. Closest wins!' },
+];
+
+function HowToPlay({ onClose }) {
+  const [i, setI] = useState(0);
+  const last = i === HELP_STEPS.length - 1;
+  const step = HELP_STEPS[i];
+  return (
+    <div className="help-overlay" onClick={onClose}>
+      <div className="help-card" onClick={(e) => e.stopPropagation()}>
+        <div className="help-icon">{step.icon}</div>
+        <h3 className="help-title">{step.title}</h3>
+        <p className="help-body">{step.body}</p>
+        <div className="help-dots">
+          {HELP_STEPS.map((_, n) => <span key={n} className={`help-dot ${n === i ? 'on' : ''}`} onClick={() => setI(n)} />)}
+        </div>
+        <div className="help-actions">
+          <button className="ghost small" onClick={onClose}>Skip</button>
+          {i > 0 && <button className="ghost small" onClick={() => setI(i - 1)}>Back</button>}
+          <button className="small" onClick={() => (last ? onClose() : setI(i + 1))}>{last ? 'Let’s go!' : 'Next'}</button>
         </div>
       </div>
     </div>

@@ -186,6 +186,8 @@ export default function MapView({
   onStationClick,
   onMapClick,
   focus,              // { lat, lng, zoom } — start (and follow) here instead of city-wide
+  initialView,        // { lat, lng, zoom } — restore a remembered pan/zoom on mount
+  onViewChange,       // (view) => void — reports {lat,lng,zoom} after pan/zoom
 }) {
   const mapRef = useRef(null);
   const containerRef = useRef(null);
@@ -196,13 +198,14 @@ export default function MapView({
   const shadeData = useRef(null);
   const stationMarkers = useRef({});
   const handlers = useRef({});
-  handlers.current = { onStationClick, onMapClick, clickMode };
+  handlers.current = { onStationClick, onMapClick, clickMode, onViewChange };
 
   // init once network is loaded
   useEffect(() => {
     if (!network || mapRef.current || !containerRef.current) return;
     const map = L.map(containerRef.current, { zoomControl: true, attributionControl: true });
     if (focus) map.setView([focus.lat, focus.lng], focus.zoom || 16);
+    else if (initialView) map.setView([initialView.lat, initialView.lng], initialView.zoom);
     else map.setView(network.center || [37.7649, -122.4394], network.zoom || 13);
     tileRef.current = L.tileLayer(TILE_URLS[theme] || TILE_URLS.dark, {
       attribution: 'Tiles &copy; Esri',
@@ -230,6 +233,10 @@ export default function MapView({
     }
     map.on('click', (e) => {
       if (handlers.current.clickMode === 'point') handlers.current.onMapClick?.(e.latlng.lat, e.latlng.lng);
+    });
+    map.on('moveend zoomend', () => {
+      const c = map.getCenter();
+      handlers.current.onViewChange?.({ lat: c.lat, lng: c.lng, zoom: map.getZoom() });
     });
 
     // exclusion shade: fixed to the map container (not a transformed pane)

@@ -16,6 +16,7 @@ export default function ImmersiveView({ state, network, act, embedKey, onExit })
   const panoRef = useRef(null);
   const svcRef = useRef(null);
   const stopPosRef = useRef(null); // where the stop is (first pano position on arrival)
+  const mapsViewRef = useRef(null); // remembered pan/zoom for the Maps app
   const [heading, setHeading] = useState(0);
   const [pos, setPos] = useState(state.seekerPos);
   const [live, setLive] = useState(false);
@@ -175,7 +176,7 @@ export default function ImmersiveView({ state, network, act, embedKey, onExit })
       {!aboard && !busScene && (
         <>
           {confirmed ? (
-            <EndgameView state={state} network={network} act={actRef.current} latestPhoto={latestPhoto}
+            <EndgameView state={state} network={network} act={actRef.current} latestPhoto={latestPhoto} livePos={pos}
               theme={phoneTheme} onDropPin={dropPin} onPhoto={() => latestPhoto && setLightbox(latestPhoto)} />
           ) : (
             <>
@@ -213,7 +214,8 @@ export default function ImmersiveView({ state, network, act, embedKey, onExit })
           )}
 
           {phoneOpen && app === 'maps' && (
-            <MapsApp network={network} state={state} theme={phoneTheme} act={actRef.current} onBack={goHome} />
+            <MapsApp network={network} state={state} theme={phoneTheme} act={actRef.current} onBack={goHome}
+              savedView={mapsViewRef.current} onView={(v) => { mapsViewRef.current = v; }} />
           )}
 
           {phoneOpen && app !== 'maps' && (
@@ -449,7 +451,7 @@ function TextsApp({ state, network, act, hiderName, onOpenPhoto }) {
   );
 }
 
-function MapsApp({ network, state, theme, act, onBack }) {
+function MapsApp({ network, state, theme, act, onBack, savedView, onView }) {
   const [sel, setSel] = useState(null);
   const [pendingWalk, setPendingWalk] = useState(null);
   const [walkMsg, setWalkMsg] = useState(null);
@@ -503,6 +505,8 @@ function MapsApp({ network, state, theme, act, onBack }) {
         pin={pendingWalk}
         clickMode="point"
         onMapClick={onMapClick}
+        initialView={savedView}
+        onViewChange={onView}
       />
       <div className="maps-topbar">
         <button className="maps-back" onClick={onBack}>‹ Back to phone</button>
@@ -558,9 +562,10 @@ function MapLegend({ lines }) {
   );
 }
 
-function EndgameView({ state, network, act, latestPhoto, theme, onDropPin, onPhoto }) {
+function EndgameView({ state, network, act, latestPhoto, livePos, theme, onDropPin, onPhoto }) {
   const [pendingWalk, setPendingWalk] = useState(null);
-  const here = state.seekerPos;
+  // follow where you've wandered in Street View, so the dot + map track you live
+  const here = livePos || state.seekerPos;
   const guesses = state.feed.filter((f) => f.kind === 'guess' && f.lat);
   const radarHistory = state.feed
     .filter((f) => f.type === 'radar' && f.center)

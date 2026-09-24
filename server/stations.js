@@ -7,11 +7,20 @@ const CITY_DEFS = [
   require('./cities/nyc'),
   require('./cities/chicago'),
   require('./cities/tokyo'),
+  require('./cities/london'),
+  require('./cities/paris'),
+  require('./cities/la'),
+  require('./cities/boston'),
+  require('./cities/dc'),
+  require('./cities/berlin'),
 ];
 const DEFAULT_CITY = 'sf';
 
 // What you ride inside each city (drives the "inside the vehicle" screen)
-const VEHICLES = { sf: 'bus', chicago: 'train', nyc: 'train', tokyo: 'train' };
+const VEHICLES = {
+  sf: 'bus', chicago: 'train', nyc: 'train', tokyo: 'train',
+  london: 'train', paris: 'train', la: 'train', boston: 'train', dc: 'train', berlin: 'train',
+};
 
 const TRANSFER_PENALTY = 0; // kept simple
 

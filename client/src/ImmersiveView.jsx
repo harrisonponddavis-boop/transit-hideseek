@@ -8,6 +8,23 @@ const RADARS = [{ km: 0.5, c: 5 }, { km: 1, c: 4 }, { km: 2, c: 3 }, { km: 5, c:
 const BOARD_RADIUS = 35;   // metres you must be within to board (~100 ft)
 const WALK_RADIUS = 250;   // how far you can walk from your station on the map
 
+// A glowing pin we drop onto the Street View panorama at the stop's real
+// coordinates. Google anchors it into the 3D scene, so it marks the exact spot
+// on the road — you can look around and walk off, and it stays put to walk back to.
+function stopMarkerIcon(vehicle) {
+  const glyph = vehicle === 'bus'
+    ? '<rect x="16" y="14" width="16" height="15" rx="3" fill="#241a06"/><rect x="18" y="16" width="12" height="6" rx="1.4" fill="#ffd23f"/><circle cx="20.5" cy="26.5" r="1.9" fill="#ffd23f"/><circle cx="27.5" cy="26.5" r="1.9" fill="#ffd23f"/>'
+    : '<rect x="16" y="13" width="16" height="16" rx="4" fill="#241a06"/><rect x="18" y="15" width="12" height="7" rx="1.4" fill="#ffd23f"/><rect x="18" y="24" width="5" height="3" rx="1" fill="#ffd23f"/><rect x="25" y="24" width="5" height="3" rx="1" fill="#ffd23f"/>';
+  const svg =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="48" height="66" viewBox="0 0 48 66">' +
+    '<defs><filter id="b" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="2.4"/></filter></defs>' +
+    '<ellipse cx="24" cy="61" rx="13" ry="4.2" fill="#ffd23f" opacity="0.4" filter="url(#b)"/>' +
+    '<path d="M24 4C14 4 6 11.6 6 21c0 12.4 18 35 18 35s18-22.6 18-35C42 11.6 34 4 24 4z" fill="#ffb200" stroke="#3a2a00" stroke-width="2.2"/>' +
+    glyph +
+    '</svg>';
+  return 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg);
+}
+
 // The seeker's main screen: you stand at a real station in Street View and do
 // everything through your phone — catch a line at the stop, plan on the Maps
 // app, and text the hider questions. Once you confirm the hider's station it
@@ -17,6 +34,7 @@ export default function ImmersiveView({ state, network, act, embedKey, onExit })
   const panoRef = useRef(null);
   const svcRef = useRef(null);
   const stopPosRef = useRef(null); // where the stop is (first pano position on arrival)
+  const stopMarkerRef = useRef(null); // glowing pin on the panorama marking that stop
   const mapsViewRef = useRef(null); // remembered pan/zoom for the Maps app
   const [heading, setHeading] = useState(0);
   const [pos, setPos] = useState(state.seekerPos);
@@ -38,10 +56,31 @@ export default function ImmersiveView({ state, network, act, embedKey, onExit })
   const confirmed = !!state.stationConfirmed;
 
   const actRef = useRef(act); actRef.current = act;
+  const vehicleRef = useRef(vehicle); vehicleRef.current = vehicle;
+  const confirmedRef = useRef(confirmed); confirmedRef.current = confirmed;
 
   useEffect(() => {
     try { localStorage.setItem('ths-phone-theme', phoneTheme); } catch { /* ignore */ }
   }, [phoneTheme]);
+
+  // Drop / remove the glowing stop pin on the live panorama.
+  const clearStopMarker = () => {
+    if (stopMarkerRef.current) { stopMarkerRef.current.setMap(null); stopMarkerRef.current = null; }
+  };
+  const paintStopMarker = (loc) => {
+    const maps = window.google?.maps;
+    const pano = panoRef.current;
+    if (!maps || !pano) return;
+    clearStopMarker();
+    stopMarkerRef.current = new maps.Marker({
+      position: loc, map: pano, title: 'Your stop — walk back here to board',
+      optimized: false, zIndex: 60, animation: maps.Animation.DROP,
+      icon: {
+        url: stopMarkerIcon(vehicleRef.current),
+        scaledSize: new maps.Size(48, 66), anchor: new maps.Point(24, 58),
+      },
+    });
+  };
 
   const goToPano = (loc) => {
     const pano = panoRef.current, svc = svcRef.current;
@@ -79,7 +118,10 @@ export default function ImmersiveView({ state, network, act, embedKey, onExit })
         if (!p) return;
         const np = { lat: p.lat(), lng: p.lng() };
         setPos(np);
-        if (!stopPosRef.current) stopPosRef.current = np; // first fix at a station = the stop
+        if (!stopPosRef.current) {
+          stopPosRef.current = np; // first fix at a station = the stop
+          if (!confirmedRef.current) paintStopMarker(np); // mark it on the road
+        }
       });
       goToPano(state.seekerPos);
     }).catch(() => {});
@@ -89,7 +131,11 @@ export default function ImmersiveView({ state, network, act, embedKey, onExit })
   // a NEW station means a new stop — forget the old one so the next pano fix
   // (the spawn point) becomes the stop. Walking doesn't change the station, so
   // the stop stays put and the return-compass keeps pointing back to it.
-  useEffect(() => { stopPosRef.current = null; }, [seekerStation]);
+  useEffect(() => { stopPosRef.current = null; clearStopMarker(); }, [seekerStation]);
+
+  // The endgame is a free hunt, not a boarding — take the stop pin down.
+  useEffect(() => { if (confirmed) clearStopMarker(); }, [confirmed]);
+  useEffect(() => () => clearStopMarker(), []); // release the pin on unmount
 
   // follow the seeker's position (a ride or a walk) by recentring the panorama
   useEffect(() => {

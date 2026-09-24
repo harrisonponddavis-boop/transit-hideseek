@@ -9,6 +9,8 @@ const {
   board, disembark,
   createSoloGame, placeSoloHider, soloPhoto, matchCategoriesFor, earnStudy,
 } = require('./game');
+const db = require('./db');
+const auth = require('./auth');
 
 const STREET_VIEW_KEY = process.env.GOOGLE_MAPS_KEY || '';
 // Separate browser key for the in-app Street View iframe (Maps Embed API).
@@ -23,11 +25,49 @@ const io = new Server(server, { cors: { origin: '*' }, maxHttpBufferSize: 2e6 })
 // GAME_PORT (not PORT) so dev-harness PORT injection can't collide with vite
 const PORT = process.env.GAME_PORT || process.env.PORT || 3001;
 
+app.use(express.json({ limit: '256kb' }));
+
 // Serve the built client in production
 const dist = path.join(__dirname, '..', 'client', 'dist');
 app.use(express.static(dist));
 // Client config (no secrets beyond the browser-safe embed key)
-app.get('/config', (_req, res) => res.json({ embedKey: EMBED_KEY }));
+app.get('/config', (_req, res) => res.json({ embedKey: EMBED_KEY, accounts: db.enabled }));
+
+// ---- Accounts (username + password) ------------------------------------
+// All routes degrade gracefully when the database is disabled.
+function requireAuth(req, res, next) {
+  const h = req.headers.authorization || '';
+  const token = h.startsWith('Bearer ') ? h.slice(7) : '';
+  const payload = auth.verifyToken(token);
+  if (!payload) return res.status(401).json({ error: 'Please sign in again' });
+  req.uid = payload.uid;
+  req.username = payload.username;
+  next();
+}
+
+// wrap async handlers so a thrown error becomes a clean JSON message
+const h = (fn) => (req, res) => fn(req, res).catch((e) => {
+  console.error(`[api] ${req.method} ${req.path}:`, e.message);
+  res.status(500).json({ error: 'Something went wrong — try again in a moment' });
+});
+
+app.post('/auth/register', h(async (req, res) => {
+  const { username, password } = req.body || {};
+  res.json(await auth.register(username, password));
+}));
+app.post('/auth/login', h(async (req, res) => {
+  const { username, password } = req.body || {};
+  res.json(await auth.login(username, password));
+}));
+app.get('/me/data', requireAuth, h(async (req, res) => {
+  res.json(await auth.getData(req.uid));
+}));
+app.put('/me/data', requireAuth, h(async (req, res) => {
+  res.json(await auth.saveData(req.uid, req.body || {}));
+}));
+app.post('/me/game', requireAuth, h(async (req, res) => {
+  res.json(await auth.recordGame(req.uid, req.body || {}));
+}));
 
 // City list for the picker, and per-city network for the map
 app.get('/cities', (_req, res) => res.json(listCities()));
@@ -273,4 +313,6 @@ server.listen(PORT, () => {
       ? `Street View photos: ENABLED (key ends in …${STREET_VIEW_KEY.slice(-4)})`
       : 'Street View photos: DISABLED (no GOOGLE_MAPS_KEY env var)'
   );
+  // Bring up the accounts database if one is configured (safe no-op otherwise).
+  db.init().catch((e) => console.error('[db] init error:', e.message));
 });

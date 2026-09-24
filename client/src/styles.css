@@ -1023,3 +1023,16 @@ a { color: var(--amber); }
 .sq-result { font-family: var(--mono); font-size: 13px; padding: 6px 2px; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
 .sq-result.ok { color: #28c76f; }
 .sq-result.no { color: #ef4b5d; }
+
+/* ================= accounts ================= */
+.account-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  margin: -6px -4px 16px; padding: 8px 12px; background: var(--panel-2); border: 1px solid var(--edge);
+  border-radius: 5px; }
+.account-bar .acct-who { font-family: var(--mono); font-size: 13px; color: var(--bone); font-weight: 600; }
+.account-bar .acct-hint { font-family: var(--mono); font-size: 11.5px; color: var(--muted); line-height: 1.4; }
+.account-bar button { flex: none; }
+
+.auth-card { width: min(400px, 94vw); background: var(--panel); border: 1px solid var(--edge);
+  border-top: 3px solid var(--amber); border-radius: 6px; padding: 26px 24px 22px;
+  box-shadow: 0 24px 70px rgba(0,0,0,0.6); animation: cardUp 0.3s ease; }
+.auth-err { font-family: var(--mono); font-size: 12.5px; color: #ef4b5d; margin: 4px 0 2px; }

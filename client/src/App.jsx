@@ -6,6 +6,10 @@ import StreetViewPanel from './StreetViewPanel';
 import MiniMap from './MiniMap';
 import ImmersiveView from './ImmersiveView';
 import { loadStudyQuestions, saveStudyQuestions } from './study';
+import {
+  getUsername, isSignedIn, register, login, clearSession,
+  fetchMyData, saveMyData, recordGame,
+} from './auth';
 
 const RADAR_OPTIONS = [
   { km: 0.5, cost: 5 },
@@ -25,12 +29,52 @@ export default function App() {
   const [theme, setTheme] = useState(() => localStorage.getItem('ths-theme') || 'dark');
   const [embedKey, setEmbedKey] = useState('');
   const [immersive, setImmersive] = useState(true); // seeker's default main screen
+  const [user, setUser] = useState(() => getUsername() || null); // signed-in username
+  const [accounts, setAccounts] = useState(false); // is the account system live?
+  const syncedRef = useRef(false); // don't push prefs to the server before first pull
+  const recordedRef = useRef(false); // record each finished game's stats only once
 
   useEffect(() => {
     socket.on('state', setState);
-    fetch('/config').then((r) => r.json()).then((c) => setEmbedKey(c.embedKey || '')).catch(() => {});
+    fetch('/config').then((r) => r.json()).then((c) => {
+      setEmbedKey(c.embedKey || '');
+      setAccounts(!!c.accounts);
+    }).catch(() => {});
     return () => socket.off('state', setState);
   }, []);
+
+  // On load, if we hold a session token, pull the account's data down. The
+  // server is the source of truth for a signed-in player.
+  useEffect(() => {
+    if (!isSignedIn()) { syncedRef.current = true; return; }
+    (async () => {
+      const data = await fetchMyData();
+      if (!data) { setUser(null); }
+      else {
+        if (Array.isArray(data.studyQuestions)) saveStudyQuestions(data.studyQuestions);
+        if (data.prefs?.theme) setTheme(data.prefs.theme);
+      }
+      syncedRef.current = true;
+    })();
+  }, []);
+
+  // Sign in / create account succeeded: adopt the session and reconcile data.
+  const handleAuthed = async (username) => {
+    setUser(username);
+    const localQs = loadStudyQuestions();
+    const data = await fetchMyData();
+    if (!data) return;
+    if ((!data.studyQuestions || data.studyQuestions.length === 0) && localQs.length > 0) {
+      // brand-new/empty account but the player wrote questions as a guest — keep them
+      await saveMyData({ studyQuestions: localQs });
+    } else {
+      saveStudyQuestions(data.studyQuestions || []);
+    }
+    if (data.prefs?.theme) setTheme(data.prefs.theme);
+    syncedRef.current = true;
+  };
+
+  const handleLogout = () => { clearSession(); setUser(null); };
 
   // load the right city's network whenever the game's city is known/changes
   const cityId = state?.cityId;
@@ -44,7 +88,22 @@ export default function App() {
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     localStorage.setItem('ths-theme', theme);
+    // once we've pulled the account down, keep the server copy of the theme in step
+    if (syncedRef.current && isSignedIn()) saveMyData({ prefs: { theme } });
   }, [theme]);
+
+  // When a game finishes, log the result to the signed-in player's lifetime stats.
+  useEffect(() => {
+    if (state?.phase === 'ended') {
+      if (!recordedRef.current && isSignedIn() && state.you?.role === 'seeker') {
+        recordedRef.current = true;
+        const won = state.feed?.some((f) => f.kind === 'guess' && f.hit);
+        recordGame({ won: !!won, coins: state.coins, city: state.cityId });
+      }
+    } else {
+      recordedRef.current = false;
+    }
+  }, [state?.phase]);
 
   const flash = (msg) => {
     setToast(msg);
@@ -60,7 +119,7 @@ export default function App() {
   const seekerSeeking = state && state.phase === 'seeking' && state.you.role === 'seeker';
 
   let view, immersiveActive = false;
-  if (!state) view = <Home flash={flash} />;
+  if (!state) view = <Home flash={flash} user={user} accounts={accounts} onAuthed={handleAuthed} onLogout={handleLogout} />;
   else if (state.phase === 'lobby') view = <Lobby state={state} act={act} />;
   else if (state.phase === 'hiding')
     view = state.you.role === 'hider'
@@ -106,8 +165,8 @@ function Board({ state, network, theme, setTheme }) {
   );
 }
 
-function Home({ flash }) {
-  const [name, setName] = useState('');
+function Home({ flash, user, accounts, onAuthed, onLogout }) {
+  const [name, setName] = useState(() => user || '');
   const [code, setCode] = useState('');
   const [cities, setCities] = useState([]);
   const [cityId, setCityId] = useState('sf');
@@ -115,6 +174,7 @@ function Home({ flash }) {
     try { return !localStorage.getItem('ths-seen-help'); } catch { return false; }
   });
   const [showStudy, setShowStudy] = useState(false);
+  const [showAuth, setShowAuth] = useState(false);
   const closeHelp = () => {
     setShowHelp(false);
     try { localStorage.setItem('ths-seen-help', '1'); } catch { /* ignore */ }
@@ -135,6 +195,21 @@ function Home({ flash }) {
   return (
     <div className="center-stage">
       <div className="card">
+        {accounts && (
+          <div className="account-bar">
+            {user ? (
+              <>
+                <span className="acct-who">👤 {user}</span>
+                <button className="ghost small" onClick={onLogout}>Sign out</button>
+              </>
+            ) : (
+              <>
+                <span className="acct-hint">Sign in to save your questions &amp; stats across devices</span>
+                <button className="ghost small" onClick={() => setShowAuth(true)}>Sign in</button>
+              </>
+            )}
+          </div>
+        )}
         <h2>Now Boarding</h2>
         <p className="tag">
           One player hides somewhere near a station. Seekers ride real transit
@@ -180,19 +255,80 @@ function Home({ flash }) {
         </div>
       </div>
       {showHelp && <HowToPlay onClose={closeHelp} />}
-      {showStudy && <StudyEditor onClose={() => setShowStudy(false)} />}
+      {showStudy && <StudyEditor onClose={() => setShowStudy(false)} signedIn={!!user} />}
+      {showAuth && (
+        <AuthModal flash={flash} onClose={() => setShowAuth(false)}
+          onAuthed={(u) => { onAuthed(u); setShowAuth(false); }} />
+      )}
+    </div>
+  );
+}
+
+// Sign in or create an account (username + password). No email required.
+function AuthModal({ onClose, onAuthed, flash }) {
+  const [mode, setMode] = useState('login'); // 'login' | 'register'
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const creating = mode === 'register';
+
+  const submit = async () => {
+    if (busy) return;
+    setErr('');
+    setBusy(true);
+    const r = await (creating ? register(username, password) : login(username, password));
+    setBusy(false);
+    if (r?.error) { setErr(r.error); return; }
+    if (r?.ok) { flash(creating ? 'Account created — your data will sync now' : `Welcome back, ${r.username}`); onAuthed(r.username); }
+  };
+
+  return (
+    <div className="help-overlay" onClick={onClose}>
+      <div className="auth-card" onClick={(e) => e.stopPropagation()}>
+        <h3 className="help-title" style={{ fontSize: 24 }}>{creating ? 'Create account' : 'Sign in'}</h3>
+        <p className="hint" style={{ marginBottom: 14 }}>
+          {creating
+            ? 'Pick a username and password. No email needed. This saves your study questions and stats so they follow you to any device.'
+            : 'Welcome back. Sign in to load your saved questions and stats.'}
+        </p>
+        <div className="field">
+          <label>Username</label>
+          <input type="text" value={username} autoCapitalize="none" autoCorrect="off"
+            onChange={(e) => setUsername(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && submit()} placeholder="3–20 letters or numbers" />
+        </div>
+        <div className="field">
+          <label>Password</label>
+          <input type="password" value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && submit()} placeholder={creating ? 'at least 6 characters' : 'your password'} />
+        </div>
+        {err && <p className="auth-err">{err}</p>}
+        <button style={{ width: '100%', marginTop: 4 }} disabled={busy} onClick={submit}>
+          {busy ? 'One sec…' : creating ? 'Create account' : 'Sign in'}
+        </button>
+        <button className="ghost small" style={{ width: '100%', marginTop: 10 }}
+          onClick={() => { setErr(''); setMode(creating ? 'login' : 'register'); }}>
+          {creating ? 'I already have an account — sign in' : "New here? Create an account"}
+        </button>
+      </div>
     </div>
   );
 }
 
 // Author your own multiple-choice questions for study mode (saved in the browser).
-function StudyEditor({ onClose }) {
+function StudyEditor({ onClose, signedIn }) {
   const [questions, setQuestions] = useState(() => loadStudyQuestions());
   const [q, setQ] = useState('');
   const [opts, setOpts] = useState(['', '', '', '']);
   const [correct, setCorrect] = useState(0);
 
-  const persist = (next) => { setQuestions(next); saveStudyQuestions(next); };
+  const persist = (next) => {
+    setQuestions(next);
+    saveStudyQuestions(next);
+    if (signedIn) saveMyData({ studyQuestions: next });
+  };
   const add = () => {
     const cleanOpts = opts.map((o) => o.trim()).filter(Boolean);
     if (!q.trim() || cleanOpts.length < 2) return;
@@ -208,7 +344,7 @@ function StudyEditor({ onClose }) {
         <h3 className="help-title" style={{ fontSize: 24 }}>Study questions</h3>
         <p className="hint" style={{ marginBottom: 14 }}>
           Write your own multiple-choice questions. In study mode you earn coins by answering them right —
-          riding is free. Saved on this device.
+          riding is free. {signedIn ? 'Saved to your account.' : 'Saved on this device.'}
         </p>
         <div className="study-list">
           {questions.length === 0 && <p className="hint">No questions yet — add your first below.</p>}

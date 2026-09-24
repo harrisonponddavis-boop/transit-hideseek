@@ -8,7 +8,10 @@
     "test": "node test-sim.js"
   },
   "dependencies": {
+    "bcryptjs": "^2.4.3",
     "express": "^4.21.0",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.13.1",
     "socket.io": "^4.8.0"
   },
   "devDependencies": {

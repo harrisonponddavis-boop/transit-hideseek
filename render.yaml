@@ -11,3 +11,7 @@ services:
         sync: false
       - key: GOOGLE_MAPS_BROWSER_KEY  # browser: Maps Embed API (in-app Street View)
         sync: false
+      - key: DATABASE_URL             # Neon Postgres connection string (accounts + saved data)
+        sync: false
+      - key: AUTH_SECRET              # signs login tokens; Render generates a strong random value
+        generateValue: true

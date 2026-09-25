@@ -1037,6 +1037,42 @@ a { color: var(--amber); }
   box-shadow: 0 24px 70px rgba(0,0,0,0.6); animation: cardUp 0.3s ease; }
 .auth-err { font-family: var(--mono); font-size: 12.5px; color: #ef4b5d; margin: 4px 0 2px; }
 
+/* ================= home menu (multi-column) ================= */
+.home-card { width: min(920px, 96vw); background: var(--panel); border: 1px solid var(--edge);
+  border-top: 3px solid var(--amber); border-radius: 8px; padding: 24px 26px;
+  box-shadow: 0 24px 70px rgba(0,0,0,0.5); }
+.home-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+  flex-wrap: wrap; margin-bottom: 18px; }
+.home-title h2 { margin: 0 0 4px; }
+.home-title .tag { margin: 0; max-width: 460px; }
+.home-acct { margin: 0; flex: none; }
+.home-grid { display: grid; grid-template-columns: 0.9fr 1.1fr; gap: 26px; }
+.home-setup { display: flex; flex-direction: column; gap: 4px; }
+.city-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
+.city-grid button { width: 100%; }
+.modes-label, .home-setup label { display: block; }
+.modes-label { font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 8px; }
+.mode-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.mode-tile { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left;
+  padding: 14px 14px; background: var(--panel-2); border: 1px solid var(--edge); border-left: 3px solid var(--amber);
+  border-radius: 6px; cursor: pointer; transition: transform 0.12s, border-color 0.12s, background 0.12s; }
+.mode-tile:hover { transform: translateY(-2px); border-color: var(--amber); background: var(--panel); }
+.mode-tile .mt-icon { font-size: 24px; line-height: 1; }
+.mode-tile .mt-name { font-family: var(--display); font-size: 16px; letter-spacing: 0.03em; color: var(--bone); }
+.mode-tile .mt-sub { font-family: var(--mono); font-size: 10.5px; color: var(--muted); }
+.mode-tile.solo   { border-left-color: #ffd23f; }
+.mode-tile.career { border-left-color: #8a72c8; }
+.mode-tile.multi  { border-left-color: #22d3ee; }
+.mode-tile.study  { border-left-color: #2ecc71; }
+.mode-tile.board  { border-left-color: #ff9f43; }
+.mode-tile.help   { border-left-color: #7a828f; }
+.home-foot-link { margin-top: 12px; }
+@media (max-width: 720px) {
+  .home-grid { grid-template-columns: 1fr; gap: 18px; }
+  .home-head { flex-direction: column; }
+}
+
 /* ================= career / story mode ================= */
 .career-launch { background: linear-gradient(135deg, #2a2140, #3a2a5a); border: 1px solid #5b4a86;
   color: #e9e2ff; font-family: var(--display); letter-spacing: 0.06em; }
@@ -1105,3 +1141,12 @@ a { color: var(--amber); }
 .lb-rank { width: 26px; text-align: center; font-weight: 700; color: var(--muted); font-size: 13px; }
 .lb-name { flex: 1; color: var(--bone); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lb-mins { color: var(--amber); font-weight: 700; font-size: 13px; }
+
+/* thermometer control on the immersive map */
+.maps-thermo { position: absolute; top: 58px; right: 12px; z-index: 30; font-family: var(--mono);
+  font-size: 12px; padding: 8px 12px; border-radius: 6px; background: rgba(12,14,18,0.9); color: var(--bone);
+  border: 1px solid var(--edge); cursor: pointer; backdrop-filter: blur(4px); }
+.maps-thermo:hover { border-color: var(--amber); }
+.maps-thermo.live { border-color: #ff6b4a; color: #ffd9cf; background: rgba(60,20,12,0.9); }
+.maps-thermo-hint { position: absolute; top: 92px; right: 12px; z-index: 30; max-width: 220px; text-align: right;
+  font-family: var(--mono); font-size: 10.5px; color: var(--muted); line-height: 1.4; }

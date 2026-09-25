@@ -263,68 +263,100 @@ function Home({ flash, user, accounts, onAuthed, onLogout, onCareer, onBoard }) 
   };
   return (
     <div className="center-stage">
-      <div className="card">
-        {accounts && (
-          <div className="account-bar">
-            {user ? (
-              <>
-                <span className="acct-who">👤 {user}</span>
-                <button className="ghost small" onClick={onLogout}>Sign out</button>
-              </>
-            ) : (
-              <>
-                <span className="acct-hint">Sign in to save your questions &amp; stats across devices</span>
-                <button className="ghost small" onClick={() => setShowAuth(true)}>Sign in</button>
-              </>
-            )}
+      <div className="home-card">
+        <div className="home-head">
+          <div className="home-title">
+            <h2>Now Boarding</h2>
+            <p className="tag">One player hides near a station. Ride real transit, spend coins on
+              questions, and drop a pin within metres of them to win.</p>
           </div>
-        )}
-        <h2>Now Boarding</h2>
-        <p className="tag">
-          One player hides somewhere near a station. Seekers ride real transit
-          times, burn coins on questions, and win by dropping a pin within metres
-          of the hiding spot.
-        </p>
-        <div className="field">
-          <label>Your name</label>
-          <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Andrew" />
+          {accounts && (
+            <div className="account-bar home-acct">
+              {user ? (
+                <>
+                  <span className="acct-who">👤 {user}</span>
+                  <button className="ghost small" onClick={onLogout}>Sign out</button>
+                </>
+              ) : (
+                <>
+                  <span className="acct-hint">Sign in to save your progress across devices</span>
+                  <button className="ghost small" onClick={() => setShowAuth(true)}>Sign in</button>
+                </>
+              )}
+            </div>
+          )}
         </div>
-        <div className="field">
-          <label>City</label>
-          <div className="row" style={{ flexWrap: 'wrap' }}>
-            {cities.map((c) => (
-              <button key={c.id} className={`small ${cityId === c.id ? '' : 'ghost'}`}
-                onClick={() => setCityId(c.id)}>
-                {c.name}
+
+        <div className="home-grid">
+          <div className="home-setup">
+            <div className="field">
+              <label>Your name</label>
+              <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Andrew" />
+            </div>
+            <div className="field">
+              <label>City</label>
+              <div className="city-grid">
+                {cities.map((c) => (
+                  <button key={c.id} className={`small ${cityId === c.id ? '' : 'ghost'}`}
+                    onClick={() => setCityId(c.id)}>
+                    {c.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="field">
+              <label>Join a friend's game</label>
+              <div className="row">
+                <input
+                  type="text" value={code} placeholder="ROOM CODE" maxLength={4}
+                  onChange={(e) => setCode(e.target.value.toUpperCase())}
+                  style={{ letterSpacing: '0.3em', textTransform: 'uppercase' }}
+                />
+                <button className="ghost" onClick={() => go('join', { code, name })}>Join</button>
+              </div>
+            </div>
+          </div>
+
+          <div className="home-modes">
+            <label className="modes-label">Choose a mode</label>
+            <div className="mode-grid">
+              <button className="mode-tile solo" onClick={() => go('createSolo', { name, cityId })}>
+                <span className="mt-icon">🕵️</span>
+                <span className="mt-name">Hunt the Phantom</span>
+                <span className="mt-sub">Solo · chase an AI hider</span>
               </button>
-            ))}
+              <button className="mode-tile career" onClick={onCareer}>
+                <span className="mt-icon">🎖</span>
+                <span className="mt-name">Career / Story</span>
+                <span className="mt-sub">Jobs, cash, stars & skins</span>
+              </button>
+              <button className="mode-tile multi" onClick={() => go('create', { name, cityId })}>
+                <span className="mt-icon">👥</span>
+                <span className="mt-name">Create a game</span>
+                <span className="mt-sub">Play with friends</span>
+              </button>
+              <button className="mode-tile study" onClick={() => go('createSolo', { name, cityId, study: true })}>
+                <span className="mt-icon">📝</span>
+                <span className="mt-name">Study mode</span>
+                <span className="mt-sub">Earn coins on your own quiz</span>
+              </button>
+              {accounts && (
+                <button className="mode-tile board" onClick={onBoard}>
+                  <span className="mt-icon">🏆</span>
+                  <span className="mt-name">Leaderboards</span>
+                  <span className="mt-sub">Fastest times per city</span>
+                </button>
+              )}
+              <button className="mode-tile help" onClick={() => setShowHelp(true)}>
+                <span className="mt-icon">❓</span>
+                <span className="mt-name">How to play</span>
+                <span className="mt-sub">Learn the ropes</span>
+              </button>
+            </div>
+            <button className="ghost small home-foot-link" onClick={() => setShowStudy(true)}>
+              Edit study questions
+            </button>
           </div>
-        </div>
-        <button style={{ width: '100%' }} onClick={() => go('create', { name, cityId })}>
-          Create a game
-        </button>
-        <button className="ghost" style={{ width: '100%', marginTop: 10 }} onClick={() => go('createSolo', { name, cityId })}>
-          Hunt the Phantom (solo)
-        </button>
-        <button className="ghost" style={{ width: '100%', marginTop: 10 }} onClick={() => go('createSolo', { name, cityId, study: true })}>
-          📝 Study mode (solo)
-        </button>
-        <button className="career-launch" style={{ width: '100%', marginTop: 10 }} onClick={onCareer}>
-          🎖 Career / Story mode
-        </button>
-        <div className="row" style={{ marginTop: 10 }}>
-          <button className="ghost small" onClick={() => setShowHelp(true)}>？ How to play</button>
-          <button className="ghost small" onClick={() => setShowStudy(true)}>Edit study questions</button>
-          {accounts && <button className="ghost small" onClick={onBoard}>🏆 Leaderboards</button>}
-        </div>
-        <div className="divider">or join one</div>
-        <div className="row">
-          <input
-            type="text" value={code} placeholder="ROOM CODE" maxLength={4}
-            onChange={(e) => setCode(e.target.value.toUpperCase())}
-            style={{ letterSpacing: '0.3em', textTransform: 'uppercase' }}
-          />
-          <button className="ghost" onClick={() => go('join', { code, name })}>Join</button>
         </div>
       </div>
       {showHelp && <HowToPlay onClose={closeHelp} />}

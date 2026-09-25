@@ -64,6 +64,12 @@ export function geoConstraints(feed, network) {
       if (q.type === 'compass' && q.center) {
         return [{ kind: 'halfplane', center: q.center, dir: q.answer }];
       }
+      if (q.type === 'thermometer' && q.thermoFrom && q.thermoTo && q.answer !== 'SAME') {
+        // hider is closer to the warmer endpoint; the cold half is impossible
+        const warm = q.answer === 'WARMER' ? q.thermoTo : q.thermoFrom;
+        const cold = q.answer === 'WARMER' ? q.thermoFrom : q.thermoTo;
+        return [{ kind: 'bisector', warm, cold }];
+      }
       if (q.type === 'matching' && network) {
         if (q.region) return []; // regions filter whole stations, no point-level shape
         const m = matchPois(network, q);
@@ -103,6 +109,12 @@ export function possibleStations(network, feed, zoneR) {
         if (q.answer === 'SOUTH' && s.lat - latPad > q.center.lat) return false;
         if (q.answer === 'EAST' && s.lng + lngPad < q.center.lng) return false;
         if (q.answer === 'WEST' && s.lng - lngPad > q.center.lng) return false;
+      } else if (q.type === 'thermometer' && q.thermoFrom && q.thermoTo && q.answer !== 'SAME') {
+        // drop zones lying entirely on the colder side of the bisector
+        const warm = q.answer === 'WARMER' ? q.thermoTo : q.thermoFrom;
+        const cold = q.answer === 'WARMER' ? q.thermoFrom : q.thermoTo;
+        const zonePad = zoneR;
+        if (metersBetween(s, cold) + zonePad < metersBetween(s, warm) - zonePad) return false;
       } else if (q.type === 'matching' && q.region) {
         // same-region questions keep/drop whole stations by their real region
         if (yes ? s.region !== q.poiId : s.region === q.poiId) return false;
@@ -141,6 +153,10 @@ export function isPointPossible(network, feed, zoneR, pt) {
       if (c.dir === 'SOUTH' && pt.lat > c.center.lat) return false;
       if (c.dir === 'EAST' && pt.lng < c.center.lng) return false;
       if (c.dir === 'WEST' && pt.lng > c.center.lng) return false;
+    }
+    if (c.kind === 'bisector') {
+      // impossible if the point is closer to the cold endpoint than the warm one
+      if (metersBetween(c.warm, pt) > metersBetween(c.cold, pt)) return false;
     }
     if (c.kind === 'cellIn' || c.kind === 'cellOut') {
       const dStar = metersBetween(c.star, pt);

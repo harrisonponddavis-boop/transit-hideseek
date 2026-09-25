@@ -134,6 +134,23 @@ function drawShade(map, canvas, data) {
       else if (c.dir === 'SOUTH') m.fillRect(0, p.y, size.x, size.y - p.y);
       else if (c.dir === 'EAST') m.fillRect(p.x, 0, size.x - p.x, size.y);
       else if (c.dir === 'WEST') m.fillRect(0, 0, p.x, size.y);
+    } else if (c.kind === 'bisector') {
+      // keep only the half closer to the warm endpoint (perpendicular bisector)
+      const pw = px(c.warm.lat, c.warm.lng), pc = px(c.cold.lat, c.cold.lng);
+      const mid = { x: (pw.x + pc.x) / 2, y: (pw.y + pc.y) / 2 };
+      let nx = pw.x - pc.x, ny = pw.y - pc.y;
+      const len = Math.hypot(nx, ny) || 1;
+      nx /= len; ny /= len;            // unit normal toward the warm side
+      const dx = -ny, dy = nx;         // along the bisector line
+      const L = 4 * (size.x + size.y);
+      const poly = [
+        { x: mid.x + dx * L, y: mid.y + dy * L },
+        { x: mid.x - dx * L, y: mid.y - dy * L },
+        { x: mid.x - dx * L + nx * L, y: mid.y - dy * L + ny * L },
+        { x: mid.x + dx * L + nx * L, y: mid.y + dy * L + ny * L },
+      ];
+      m.globalCompositeOperation = 'destination-in';
+      fillPolygon(m, poly);
     } else if (c.kind === 'cellIn' || c.kind === 'cellOut') {
       const poly = voronoiCellPixels(px, c.star, c.rivals, size.x, size.y);
       if (poly.length >= 3) {

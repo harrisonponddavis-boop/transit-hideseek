@@ -483,6 +483,11 @@ function ask(game, type, params = {}) {
     const dStart = hiderDistFrom(game, game.thermoStart);
     answer = dNow < dStart ? 'WARMER' : dNow > dStart ? 'COLDER' : 'SAME';
     label = `Thermometer: ${game.thermoStart.label} → ${hereLabel}`;
+    // carry both points so the map can grey the colder half (perpendicular bisector)
+    extra = {
+      thermoFrom: { lat: game.thermoStart.lat, lng: game.thermoStart.lng },
+      thermoTo: { lat: here.lat, lng: here.lng },
+    };
     game.thermoStart = null;
   } else if (type === 'rightStation') {
     const right = game.seekerStation === game.hider.stationId;

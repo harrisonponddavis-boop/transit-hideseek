@@ -591,6 +591,14 @@ function MapsApp({ network, state, theme, act, onBack, savedView, onView }) {
     setPendingWalk({ lat, lng, mins: Math.max(1, Math.ceil((d / 1000) * state.rules.WALK_PACE_MIN_PER_KM)), meters: Math.round(d) });
   };
   const doWalk = async () => { const p = pendingWalk; setPendingWalk(null); await act('walk', { lat: p.lat, lng: p.lng }); };
+  const thermoActive = !!state.thermoStart;
+  const [thermoBusy, setThermoBusy] = useState(false);
+  const doThermo = async () => {
+    if (thermoBusy) return;
+    setThermoBusy(true);
+    await act('ask', { type: 'thermometer', params: { action: thermoActive ? 'end' : 'start' } });
+    setThermoBusy(false);
+  };
   const askFromMap = async () => {
     if (!active?.ask) return;
     setAsking(true);
@@ -607,6 +615,7 @@ function MapsApp({ network, state, theme, act, onBack, savedView, onView }) {
         theme={theme === 'light' ? 'light' : 'dark'}
         seekerStation={state.seekerStation}
         seekerPos={here}
+        thermoStart={state.thermoStart}
         radarHistory={radarHistory}
         possibleZones={possibleZones}
         travelTimes={state.travelTimes}
@@ -626,6 +635,13 @@ function MapsApp({ network, state, theme, act, onBack, savedView, onView }) {
         </span>
       </div>
       <MapLegend lines={network?.lines || []} />
+      <button className={`maps-thermo ${thermoActive ? 'live' : ''}`} onClick={doThermo} disabled={thermoBusy}
+        title="Thermometer: start here, travel, then read to see if you got warmer — it greys out the colder half of the map">
+        🌡 {thermoActive ? `Read thermometer · 3🪙` : 'Start thermometer · free'}
+      </button>
+      {thermoActive && (
+        <div className="maps-thermo-hint">Now travel or walk somewhere, then tap “Read” — the colder half of the map greys out.</div>
+      )}
       {active?.ask && !pendingWalk && (
         <div className="maps-askbar">
           <span>Preview of <b>{active.label}</b> — ask the hider for real?</span>

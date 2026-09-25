@@ -240,6 +240,15 @@ async function placeSoloHider(game, key) {
   return setHider(game, SOLO.BOT_ID, spot.stationId, spot.lat, spot.lng);
 }
 
+// Tutorial: place the target right at the start station so the guided first
+// hunt is short and always winnable.
+function placeTutorialHider(game) {
+  const city = cityOf(game);
+  const s = city.stations[city.startStation];
+  game.tutorial = true;
+  return setHider(game, SOLO.BOT_ID, city.startStation, s.lat, s.lng);
+}
+
 // The one photo per game: a real Street View image of the hiding spot
 async function soloPhoto(game, key) {
   if (!key) return { error: 'Photos are not configured on this server' };
@@ -650,5 +659,5 @@ module.exports = {
   RULES, QUESTION_DEFS, PHOTO_KINDS, SOLO, MATCH_CATEGORIES, matchCategoriesFor,
   createGame, setOptions, setHider, move, walk, ask, guess, photoReply, viewFor,
   board, disembark, linesAt, alongLineMins,
-  createSoloGame, placeSoloHider, soloPhoto, pickSoloSpot, earnStudy,
+  createSoloGame, placeSoloHider, placeTutorialHider, soloPhoto, pickSoloSpot, earnStudy,
 };

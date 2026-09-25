@@ -7,7 +7,7 @@ const { getCity, listCities } = require('./stations');
 const {
   createGame, setOptions, setHider, move, walk, ask, guess, photoReply, viewFor, PHOTO_KINDS,
   board, disembark,
-  createSoloGame, placeSoloHider, soloPhoto, matchCategoriesFor, earnStudy,
+  createSoloGame, placeSoloHider, placeTutorialHider, soloPhoto, matchCategoriesFor, earnStudy,
 } = require('./game');
 const db = require('./db');
 const auth = require('./auth');
@@ -137,14 +137,15 @@ io.on('connection', (socket) => {
     broadcast(g);
   });
 
-  socket.on('createSolo', async ({ name, cityId, study, bonusCoins }, cb) => {
+  socket.on('createSolo', async ({ name, cityId, study, bonusCoins, tutorial }, cb) => {
     if (games.size >= MAX_ROOMS) return cb({ error: 'Server is full — try again in a bit' });
     playerId = socket.id;
     socketsByPlayer.set(playerId, socket);
     const g = createSoloGame(playerId, (name || 'Seeker').slice(0, 20), !!STREET_VIEW_KEY, cityId, !!study, bonusCoins);
     games.set(g.code, g);
     gameCode = g.code;
-    await placeSoloHider(g, STREET_VIEW_KEY);
+    if (tutorial) placeTutorialHider(g);           // controlled, always-winnable first hunt
+    else await placeSoloHider(g, STREET_VIEW_KEY);
     cb({ ok: true, code: g.code });
     broadcast(g);
   });

@@ -1178,3 +1178,13 @@ a { color: var(--amber); }
 .phone.tone-spy .phone-status { color: #b79be6; }
 .phone.tone-spy { box-shadow: 0 0 0 2px rgba(165,94,234,0.35), 0 30px 80px rgba(0,0,0,0.6); }
 .phone.tone-grounded { box-shadow: 0 0 0 2px rgba(255,178,0,0.28), 0 30px 80px rgba(0,0,0,0.6); }
+
+/* ================= interactive tutorial ================= */
+.tutorial-layer { position: fixed; inset: 0; z-index: 5000; pointer-events: none; }
+.tutorial-dispatch { position: absolute; left: 16px; top: 62px;
+  width: min(330px, 78vw); pointer-events: auto; display: flex; flex-direction: column; gap: 6px; }
+.tut-progress { font-family: var(--mono); font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--amber); text-shadow: 0 1px 6px rgba(0,0,0,0.8); }
+.tutorial-dispatch .radio { max-width: none; border-left-color: #22d3ee; background: rgba(10,14,20,0.97);
+  box-shadow: 0 16px 50px rgba(0,0,0,0.7), 0 0 0 1px rgba(34,211,238,0.25); }
+.tutorial-dispatch .radio-name { color: #22d3ee; }

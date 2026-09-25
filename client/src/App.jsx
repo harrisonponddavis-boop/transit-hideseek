@@ -12,6 +12,7 @@ import {
 } from './auth';
 import CareerHub, { CareerReward } from './CareerHub';
 import Leaderboard from './Leaderboard';
+import Tutorial from './Tutorial';
 import {
   loadCareer, saveCareerLocal, normalizeCareer, starsFor, payoutFor,
   effectiveBonusCoins, JOBS,
@@ -39,6 +40,7 @@ export default function App() {
   const [accounts, setAccounts] = useState(false); // is the account system live?
   const [careerMode, setCareerMode] = useState(false); // showing the career hub
   const [boardMode, setBoardMode] = useState(false); // showing the leaderboards
+  const [tutorialMode, setTutorialMode] = useState(false); // running the interactive tutorial
   const [career, setCareer] = useState(() => loadCareer()); // career/story profile
   const [careerReward, setCareerReward] = useState(null); // { job, stars, payout }
   const [activeJob, setActiveJob] = useState(null); // career job being played (for mission UI)
@@ -119,6 +121,20 @@ export default function App() {
 
   const handleLogout = () => { clearSession(); setUser(null); };
 
+  // Interactive tutorial: a controlled, always-winnable guided first hunt.
+  const startTutorial = async () => {
+    try { localStorage.setItem('ths-seen-help', '1'); } catch { /* ignore */ }
+    setImmersive(true);
+    const r = await send('createSolo', { name: user || 'Rookie', cityId: 'sf', tutorial: true });
+    if (r?.error) { flash(r.error); return; }
+    setTutorialMode(true);
+  };
+  const finishTutorial = () => {
+    setTutorialMode(false);
+    setState(null);
+    setNetwork(null);
+  };
+
   // Start a career job: launch a solo hunt in the job's city with any perk bonus.
   const playJob = async (job) => {
     activeJobRef.current = job;
@@ -187,7 +203,7 @@ export default function App() {
   if (!state && careerMode) view = <CareerHub career={career} commit={commitCareer} onPlayJob={playJob} onExit={() => setCareerMode(false)} />;
   else if (!state && boardMode) view = <Leaderboard user={user} onExit={() => setBoardMode(false)} />;
   else if (!state) view = <Home flash={flash} user={user} accounts={accounts} onAuthed={handleAuthed} onLogout={handleLogout}
-    onCareer={() => setCareerMode(true)} onBoard={() => setBoardMode(true)} />;
+    onCareer={() => setCareerMode(true)} onBoard={() => setBoardMode(true)} onTutorial={startTutorial} />;
   else if (state.phase === 'lobby') view = <Lobby state={state} act={act} />;
   else if (state.phase === 'hiding')
     view = state.you.role === 'hider'
@@ -209,6 +225,7 @@ export default function App() {
         <CareerReward job={careerReward.job} stars={careerReward.stars} payout={careerReward.payout}
           onContinue={leaveJob} />
       )}
+      {tutorialMode && state && <Tutorial state={state} onFinish={finishTutorial} />}
       {toast && <div className="toast">{toast}</div>}
     </div>
   );
@@ -237,18 +254,19 @@ function Board({ state, network, theme, setTheme }) {
   );
 }
 
-function Home({ flash, user, accounts, onAuthed, onLogout, onCareer, onBoard }) {
+function Home({ flash, user, accounts, onAuthed, onLogout, onCareer, onBoard, onTutorial }) {
   const [name, setName] = useState(() => user || '');
   const [code, setCode] = useState('');
   const [cities, setCities] = useState([]);
   const [cityId, setCityId] = useState('sf');
-  const [showHelp, setShowHelp] = useState(() => {
+  const [showHelp, setShowHelp] = useState(false);
+  const [showWelcome, setShowWelcome] = useState(() => {
     try { return !localStorage.getItem('ths-seen-help'); } catch { return false; }
   });
   const [showStudy, setShowStudy] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
-  const closeHelp = () => {
-    setShowHelp(false);
+  const dismissWelcome = () => {
+    setShowWelcome(false);
     try { localStorage.setItem('ths-seen-help', '1'); } catch { /* ignore */ }
   };
 
@@ -350,10 +368,10 @@ function Home({ flash, user, accounts, onAuthed, onLogout, onCareer, onBoard }) 
                   <span className="mt-sub">Fastest times per city</span>
                 </button>
               )}
-              <button className="mode-tile help" onClick={() => setShowHelp(true)}>
-                <span className="mt-icon">❓</span>
+              <button className="mode-tile help" onClick={onTutorial}>
+                <span className="mt-icon">🎓</span>
                 <span className="mt-name">How to play</span>
-                <span className="mt-sub">Learn the ropes</span>
+                <span className="mt-sub">Guided first hunt</span>
               </button>
             </div>
             <button className="ghost small home-foot-link" onClick={() => setShowStudy(true)}>
@@ -362,7 +380,13 @@ function Home({ flash, user, accounts, onAuthed, onLogout, onCareer, onBoard }) 
           </div>
         </div>
       </div>
-      {showHelp && <HowToPlay onClose={closeHelp} />}
+      {showWelcome && (
+        <WelcomeModal
+          onStart={() => { dismissWelcome(); onTutorial(); }}
+          onSkip={dismissWelcome}
+          onSlides={() => { dismissWelcome(); setShowHelp(true); }} />
+      )}
+      {showHelp && <HowToPlay onClose={() => setShowHelp(false)} />}
       {showStudy && <StudyEditor onClose={() => setShowStudy(false)} signedIn={!!user} />}
       {showAuth && (
         <AuthModal flash={flash} onClose={() => setShowAuth(false)}
@@ -488,6 +512,30 @@ const HELP_STEPS = [
   { icon: '🪙', title: 'Coins & questions', body: 'You earn coins by riding and walking, and spend them on questions — radar rings, a compass, “same line?”, photos, and more. Each answer greys out part of the map.' },
   { icon: '📍', title: 'The endgame', body: 'Once you’ve found the hider’s station, you switch to a Street View hunt with their photo and a live map beside you. Walk to the exact spot and drop your pin. Closest wins!' },
 ];
+
+// First-visit welcome — offers the interactive tutorial (replacing the old
+// auto-slideshow), with the quick slides still available as a fallback.
+function WelcomeModal({ onStart, onSkip, onSlides }) {
+  return (
+    <div className="help-overlay" onClick={onSkip}>
+      <div className="help-card" onClick={(e) => e.stopPropagation()}>
+        <div className="help-icon">🚇</div>
+        <h3 className="help-title">Welcome aboard</h3>
+        <p className="help-body">
+          Transit Hide+Seek drops you into real cities and real Street View to hunt a hidden
+          player. New here? Take a quick guided hunt — Dispatch will walk you through it.
+        </p>
+        <div className="help-actions" style={{ flexDirection: 'column', gap: 8 }}>
+          <button style={{ width: '100%' }} onClick={onStart}>🎓 Start the guided hunt</button>
+          <div className="row" style={{ width: '100%' }}>
+            <button className="ghost small" style={{ flex: 1 }} onClick={onSlides}>Just the quick slides</button>
+            <button className="ghost small" style={{ flex: 1 }} onClick={onSkip}>Skip</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function HowToPlay({ onClose }) {
   const [i, setI] = useState(0);

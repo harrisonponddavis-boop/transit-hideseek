@@ -1150,3 +1150,31 @@ a { color: var(--amber); }
 .maps-thermo.live { border-color: #ff6b4a; color: #ffd9cf; background: rgba(60,20,12,0.9); }
 .maps-thermo-hint { position: absolute; top: 92px; right: 12px; z-index: 30; max-width: 220px; text-align: right;
   font-family: var(--mono); font-size: 10.5px; color: var(--muted); line-height: 1.4; }
+
+/* ================= story mission presence + radio ================= */
+.mission-banner { position: absolute; top: 64px; left: 16px; z-index: 20; display: flex; flex-direction: column;
+  gap: 1px; padding: 8px 14px; border-radius: 6px; background: rgba(12,14,18,0.85); backdrop-filter: blur(4px);
+  border-left: 3px solid var(--amber); box-shadow: 0 6px 20px rgba(0,0,0,0.4); }
+.mission-banner.spy { border-left-color: #a55eea; }
+.mission-banner .mb-tag { font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+.mission-banner .mb-title { font-family: var(--display); font-size: 15px; letter-spacing: 0.02em; color: var(--bone); }
+.mission-banner .mb-giver { font-family: var(--mono); font-size: 10.5px; color: var(--amber); }
+.mission-banner.spy .mb-giver { color: #cbb8ff; }
+
+.radio { display: flex; gap: 10px; align-items: flex-start; max-width: 340px; padding: 12px 14px;
+  background: rgba(14,16,22,0.94); border: 1px solid var(--edge); border-left: 3px solid var(--amber);
+  border-radius: 8px; box-shadow: 0 12px 40px rgba(0,0,0,0.5); }
+.radio.spy { border-left-color: #a55eea; }
+.radio-portrait { font-size: 30px; line-height: 1; flex: none; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); }
+.radio-body { display: flex; flex-direction: column; gap: 3px; }
+.radio-name { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--amber); }
+.radio.spy .radio-name { color: #cbb8ff; }
+.radio-text { font-family: var(--mono); font-size: 12.5px; line-height: 1.5; color: var(--bone); }
+.radio-actions { display: flex; gap: 8px; margin-top: 8px; justify-content: flex-end; }
+.radio-flash { position: absolute; left: 16px; bottom: 96px; z-index: 60; animation: radioIn 0.35s cubic-bezier(0.2,0.8,0.2,1); }
+@keyframes radioIn { from { opacity: 0; transform: translateX(-12px); } to { opacity: 1; transform: none; } }
+
+/* phone accent while on a story job */
+.phone.tone-spy .phone-status { color: #b79be6; }
+.phone.tone-spy { box-shadow: 0 0 0 2px rgba(165,94,234,0.35), 0 30px 80px rgba(0,0,0,0.6); }
+.phone.tone-grounded { box-shadow: 0 0 0 2px rgba(255,178,0,0.28), 0 30px 80px rgba(0,0,0,0.6); }

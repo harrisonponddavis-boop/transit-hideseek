@@ -41,6 +41,7 @@ export default function App() {
   const [boardMode, setBoardMode] = useState(false); // showing the leaderboards
   const [career, setCareer] = useState(() => loadCareer()); // career/story profile
   const [careerReward, setCareerReward] = useState(null); // { job, stars, payout }
+  const [activeJob, setActiveJob] = useState(null); // career job being played (for mission UI)
   const activeJobRef = useRef(null); // the career job currently being played
   const syncedRef = useRef(false); // don't push prefs to the server before first pull
   const recordedRef = useRef(false); // record each finished game's stats only once
@@ -121,6 +122,7 @@ export default function App() {
   // Start a career job: launch a solo hunt in the job's city with any perk bonus.
   const playJob = async (job) => {
     activeJobRef.current = job;
+    setActiveJob(job);
     setCareerReward(null);
     const r = await send('createSolo', {
       name: user || 'Agent', cityId: job.city, bonusCoins: effectiveBonusCoins(career),
@@ -130,6 +132,7 @@ export default function App() {
   // Leave a finished job and return to the hub.
   const leaveJob = () => {
     activeJobRef.current = null;
+    setActiveJob(null);
     setCareerReward(null);
     setState(null);
     setNetwork(null);
@@ -192,7 +195,7 @@ export default function App() {
       : <WaitingBoard text={`The hider is choosing a spot somewhere in ${network?.name || 'the city'}`} />;
   else if (seekerSeeking && immersive && network) {
     immersiveActive = true;
-    view = <ImmersiveView state={state} network={network} act={act} embedKey={embedKey} onExit={() => setImmersive(false)} />;
+    view = <ImmersiveView state={state} network={network} act={act} embedKey={embedKey} job={activeJob} onExit={() => setImmersive(false)} />;
   } else {
     view = <GameBoard state={state} network={network} act={act} flash={flash} theme={theme} embedKey={embedKey}
       onEnterImmersive={seekerSeeking ? () => setImmersive(true) : null} />;

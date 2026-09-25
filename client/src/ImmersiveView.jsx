@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { loadGoogleMaps } from './maps-loader';
 import { isPointPossible, possibleStations, geoConstraints, metersBetween, bearingBetween } from './solver';
 import { loadStudyQuestions } from './study';
+import { RadioBubble } from './Radio';
 import MapView from './MapView';
 
 const RADARS = [{ km: 0.5, c: 5 }, { km: 1, c: 4 }, { km: 2, c: 3 }, { km: 5, c: 2 }];
@@ -29,7 +30,22 @@ function stopMarkerIcon(vehicle) {
 // everything through your phone — catch a line at the stop, plan on the Maps
 // app, and text the hider questions. Once you confirm the hider's station it
 // flips to an endgame view with the hider's photo and map beside the panorama.
-export default function ImmersiveView({ state, network, act, embedKey, onExit }) {
+// A handler/giver line for a story job, chosen by how far along the hunt is.
+function jobRadio(job, state) {
+  if (!job) return null;
+  const spy = job.tone === 'spy';
+  if (state.stationConfirmed) {
+    return { id: 'close', text: spy ? 'That’s the station. Move in — quiet and quick.'
+      : 'Right station. Get to the exact spot and call it in.' };
+  }
+  if (state.clock <= 2 && !state.aboard) {
+    return { id: 'open', text: spy ? 'You’re live. Our window is short — find the mark and bring them in.'
+      : 'You’re on the clock. Track them down and report back to me.' };
+  }
+  return null;
+}
+
+export default function ImmersiveView({ state, network, act, embedKey, job, onExit }) {
   const elRef = useRef(null);
   const panoRef = useRef(null);
   const svcRef = useRef(null);
@@ -49,6 +65,7 @@ export default function ImmersiveView({ state, network, act, embedKey, onExit })
   const [lightbox, setLightbox] = useState(null);
   const [busScene, setBusScene] = useState(false); // fullscreen "at the stop" boarding scene
   const [traveling, setTraveling] = useState(null); // destination name while the ride wipe plays
+  const [radioDismissed, setRadioDismissed] = useState(null); // dismissed story-radio message id
 
   const seekerStation = state.seekerStation;
   const aboard = state.aboard;
@@ -210,6 +227,24 @@ export default function ImmersiveView({ state, network, act, embedKey, onExit })
         <span className="ih-city">{network?.name}</span>
       </div>
 
+      {job && (
+        <div className={`mission-banner ${job.tone}`}>
+          <span className="mb-tag">{job.arc || (job.tone === 'spy' ? 'Assignment' : 'Job')}</span>
+          <span className="mb-title">{job.title}</span>
+          <span className="mb-giver">{job.tone === 'spy' ? '🕶' : '🧥'} {job.giver}</span>
+        </div>
+      )}
+      {job && (() => {
+        const r = jobRadio(job, state);
+        if (!r || radioDismissed === r.id) return null;
+        return (
+          <div className="radio-flash">
+            <RadioBubble portrait={job.tone === 'spy' ? '🕶' : '📻'} name={job.giver}
+              text={r.text} tone={job.tone} onNext={() => setRadioDismissed(r.id)} nextLabel="Got it" />
+          </div>
+        );
+      })()}
+
       {aboard && <OnboardView state={state} network={network} onRide={rideTo} />}
 
       {/* immersive boarding: stand at the real stop (look around), board your line */}
@@ -267,7 +302,7 @@ export default function ImmersiveView({ state, network, act, embedKey, onExit })
 
           {phoneOpen && app !== 'maps' && (
             <div className="phone-backdrop" onClick={closePhone}>
-              <div className={`phone ${phoneTheme}`} onClick={(e) => e.stopPropagation()}>
+              <div className={`phone ${phoneTheme} ${job ? `tone-${job.tone}` : ''}`} onClick={(e) => e.stopPropagation()}>
                 <div className="phone-notch" />
                 <div className="phone-status">
                   <span>{String(9 + (state.clock % 3)).padStart(2, '0')}:{String(state.clock % 60).padStart(2, '0')}</span>

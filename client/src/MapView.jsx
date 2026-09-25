@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { currentDotColor as dotColor } from './career';
 
 // Esri gray canvas — keyless, clean, and made for overlaying coloured data
 // (CARTO's basemaps now watermark unauthenticated tiles).
@@ -358,11 +359,12 @@ export default function MapView({
     // the seeker's live "you are here" dot — always at the real standing position
     // (station or walked), so it visibly moves as you travel around the map
     if (seekerPos) {
+      const dot = dotColor();
       dl.addLayer(L.circle([seekerPos.lat, seekerPos.lng], {
-        radius: 40, color: '#ffd23f', weight: 1, fillColor: '#ffd23f', fillOpacity: 0.18, ...passive,
+        radius: 40, color: dot, weight: 1, fillColor: dot, fillOpacity: 0.18, ...passive,
       }));
       dl.addLayer(L.circleMarker([seekerPos.lat, seekerPos.lng], {
-        radius: 8, color: '#0b0d11', weight: 3, fillColor: '#ffd23f', fillOpacity: 1, ...passive,
+        radius: 8, color: '#0b0d11', weight: 3, fillColor: dot, fillOpacity: 1, ...passive,
       }).bindTooltip('<b>YOU</b>', { permanent: true, direction: 'top', offset: [0, -8], className: 'you-tip' }));
     }
 

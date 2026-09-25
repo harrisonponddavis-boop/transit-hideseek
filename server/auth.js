@@ -64,12 +64,12 @@ async function login(username, password) {
 
 async function getData(uid) {
   const res = await db.query(
-    'SELECT study_questions, prefs, stats FROM user_data WHERE user_id = $1',
+    'SELECT study_questions, prefs, stats, career FROM user_data WHERE user_id = $1',
     [uid]
   );
-  if (!res.rowCount) return { studyQuestions: [], prefs: {}, stats: {} };
+  if (!res.rowCount) return { studyQuestions: [], prefs: {}, stats: {}, career: {} };
   const r = res.rows[0];
-  return { studyQuestions: r.study_questions, prefs: r.prefs, stats: r.stats };
+  return { studyQuestions: r.study_questions, prefs: r.prefs, stats: r.stats, career: r.career || {} };
 }
 
 // Only the fields present in `patch` are overwritten.
@@ -83,6 +83,10 @@ async function saveData(uid, patch) {
   if (patch && patch.prefs !== undefined) {
     vals.push(JSON.stringify(patch.prefs));
     sets.push(`prefs = $${vals.length}`);
+  }
+  if (patch && patch.career !== undefined) {
+    vals.push(JSON.stringify(patch.career));
+    sets.push(`career = $${vals.length}`);
   }
   if (!sets.length) return { ok: true };
   sets.push('updated_at = now()');

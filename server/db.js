@@ -48,6 +48,8 @@ async function init() {
         updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
       );
     `);
+    // Career/story-mode progress (added later; additive + idempotent).
+    await pool.query(`ALTER TABLE user_data ADD COLUMN IF NOT EXISTS career JSONB NOT NULL DEFAULT '{}'::jsonb;`);
     ready = true;
     console.log('[db] accounts ENABLED — schema ready');
     return true;

@@ -10,6 +10,11 @@ import {
   getUsername, isSignedIn, register, login, clearSession,
   fetchMyData, saveMyData, recordGame,
 } from './auth';
+import CareerHub, { CareerReward } from './CareerHub';
+import {
+  loadCareer, saveCareerLocal, normalizeCareer, starsFor, payoutFor,
+  effectiveBonusCoins, JOBS,
+} from './career';
 
 const RADAR_OPTIONS = [
   { km: 0.5, cost: 5 },
@@ -31,8 +36,19 @@ export default function App() {
   const [immersive, setImmersive] = useState(true); // seeker's default main screen
   const [user, setUser] = useState(() => getUsername() || null); // signed-in username
   const [accounts, setAccounts] = useState(false); // is the account system live?
+  const [careerMode, setCareerMode] = useState(false); // showing the career hub
+  const [career, setCareer] = useState(() => loadCareer()); // career/story profile
+  const [careerReward, setCareerReward] = useState(null); // { job, stars, payout }
+  const activeJobRef = useRef(null); // the career job currently being played
   const syncedRef = useRef(false); // don't push prefs to the server before first pull
   const recordedRef = useRef(false); // record each finished game's stats only once
+
+  // Persist the career profile locally and, when signed in, to the account.
+  const commitCareer = (next) => {
+    setCareer(next);
+    saveCareerLocal(next);
+    if (isSignedIn()) saveMyData({ career: next });
+  };
 
   useEffect(() => {
     socket.on('state', setState);
@@ -53,10 +69,30 @@ export default function App() {
       else {
         if (Array.isArray(data.studyQuestions)) saveStudyQuestions(data.studyQuestions);
         if (data.prefs?.theme) setTheme(data.prefs.theme);
+        if (data.career && Object.keys(data.career).length) {
+          const c = normalizeCareer(data.career);
+          setCareer(c); saveCareerLocal(c);
+        }
       }
       syncedRef.current = true;
     })();
   }, []);
+
+  // Mirror the equipped dot colour to localStorage so the maps can read it.
+  useEffect(() => { saveCareerLocal(career); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Award cash + stars when a career job is won (solo end == found the target).
+  useEffect(() => {
+    const job = activeJobRef.current;
+    if (state?.phase === 'ended' && job && !careerReward) {
+      const stars = starsFor(job, state.clock);
+      const prev = career.jobs?.[job.id]?.stars || 0;
+      const payout = payoutFor(job, stars, prev);
+      const nextJobs = { ...(career.jobs || {}), [job.id]: { stars: Math.max(stars, prev) } };
+      commitCareer({ ...career, cash: career.cash + payout, jobs: nextJobs });
+      setCareerReward({ job, stars, payout });
+    }
+  }, [state?.phase]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Sign in / create account succeeded: adopt the session and reconcile data.
   const handleAuthed = async (username) => {
@@ -71,10 +107,32 @@ export default function App() {
       saveStudyQuestions(data.studyQuestions || []);
     }
     if (data.prefs?.theme) setTheme(data.prefs.theme);
+    if (data.career && Object.keys(data.career).length) {
+      const c = normalizeCareer(data.career);
+      setCareer(c); saveCareerLocal(c);
+    }
     syncedRef.current = true;
   };
 
   const handleLogout = () => { clearSession(); setUser(null); };
+
+  // Start a career job: launch a solo hunt in the job's city with any perk bonus.
+  const playJob = async (job) => {
+    activeJobRef.current = job;
+    setCareerReward(null);
+    const r = await send('createSolo', {
+      name: user || 'Agent', cityId: job.city, bonusCoins: effectiveBonusCoins(career),
+    });
+    if (r?.error) { flash(r.error); activeJobRef.current = null; }
+  };
+  // Leave a finished job and return to the hub.
+  const leaveJob = () => {
+    activeJobRef.current = null;
+    setCareerReward(null);
+    setState(null);
+    setNetwork(null);
+    setCareerMode(true);
+  };
 
   // load the right city's network whenever the game's city is known/changes
   const cityId = state?.cityId;
@@ -119,7 +177,8 @@ export default function App() {
   const seekerSeeking = state && state.phase === 'seeking' && state.you.role === 'seeker';
 
   let view, immersiveActive = false;
-  if (!state) view = <Home flash={flash} user={user} accounts={accounts} onAuthed={handleAuthed} onLogout={handleLogout} />;
+  if (!state && careerMode) view = <CareerHub career={career} commit={commitCareer} onPlayJob={playJob} onExit={() => setCareerMode(false)} />;
+  else if (!state) view = <Home flash={flash} user={user} accounts={accounts} onAuthed={handleAuthed} onLogout={handleLogout} onCareer={() => setCareerMode(true)} />;
   else if (state.phase === 'lobby') view = <Lobby state={state} act={act} />;
   else if (state.phase === 'hiding')
     view = state.you.role === 'hider'
@@ -137,6 +196,10 @@ export default function App() {
     <div className="shell">
       {!immersiveActive && <Board state={state} network={network} theme={theme} setTheme={setTheme} />}
       {view}
+      {careerReward && (
+        <CareerReward job={careerReward.job} stars={careerReward.stars} payout={careerReward.payout}
+          onContinue={leaveJob} />
+      )}
       {toast && <div className="toast">{toast}</div>}
     </div>
   );
@@ -165,7 +228,7 @@ function Board({ state, network, theme, setTheme }) {
   );
 }
 
-function Home({ flash, user, accounts, onAuthed, onLogout }) {
+function Home({ flash, user, accounts, onAuthed, onLogout, onCareer }) {
   const [name, setName] = useState(() => user || '');
   const [code, setCode] = useState('');
   const [cities, setCities] = useState([]);
@@ -239,6 +302,9 @@ function Home({ flash, user, accounts, onAuthed, onLogout }) {
         </button>
         <button className="ghost" style={{ width: '100%', marginTop: 10 }} onClick={() => go('createSolo', { name, cityId, study: true })}>
           📝 Study mode (solo)
+        </button>
+        <button className="career-launch" style={{ width: '100%', marginTop: 10 }} onClick={onCareer}>
+          🎖 Career / Story mode
         </button>
         <div className="row" style={{ marginTop: 10 }}>
           <button className="ghost small" onClick={() => setShowHelp(true)}>？ How to play</button>

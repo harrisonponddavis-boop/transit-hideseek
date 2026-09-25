@@ -1036,3 +1036,62 @@ a { color: var(--amber); }
   border-top: 3px solid var(--amber); border-radius: 6px; padding: 26px 24px 22px;
   box-shadow: 0 24px 70px rgba(0,0,0,0.6); animation: cardUp 0.3s ease; }
 .auth-err { font-family: var(--mono); font-size: 12.5px; color: #ef4b5d; margin: 4px 0 2px; }
+
+/* ================= career / story mode ================= */
+.career-launch { background: linear-gradient(135deg, #2a2140, #3a2a5a); border: 1px solid #5b4a86;
+  color: #e9e2ff; font-family: var(--display); letter-spacing: 0.06em; }
+.career-launch:hover { border-color: #8a72c8; }
+
+.career-card { width: min(560px, 95vw); max-height: 90vh; display: flex; flex-direction: column;
+  background: var(--panel); border: 1px solid var(--edge); border-top: 3px solid var(--amber);
+  border-radius: 6px; padding: 20px 22px; box-shadow: 0 24px 70px rgba(0,0,0,0.55); }
+.career-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.career-wallet { display: flex; align-items: center; gap: 12px; font-family: var(--mono); }
+.cw-title { font-size: 12px; color: var(--muted); }
+.cw-cash { font-size: 16px; font-weight: 700; color: var(--amber); }
+.career-h { font-family: var(--display); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 2px; }
+.career-tabs { display: flex; gap: 8px; margin: 12px 0; }
+.career-tabs button { flex: 1; }
+.career-scroll { overflow-y: auto; padding-right: 4px; display: flex; flex-direction: column; gap: 10px; }
+
+.job-arc { display: flex; flex-direction: column; gap: 10px; }
+.arc-label { font-family: var(--display); letter-spacing: 0.05em; text-transform: uppercase; font-size: 14px;
+  color: var(--bone); margin-top: 8px; }
+.arc-label span { color: var(--muted); font-family: var(--mono); font-size: 11px; letter-spacing: 0; text-transform: none; }
+
+.job-card { background: var(--panel-2); border: 1px solid var(--edge); border-left: 3px solid #5b4a86;
+  border-radius: 5px; padding: 12px 14px; }
+.job-card.done { border-left-color: #28c76f; }
+.job-card.locked { opacity: 0.6; border-left-color: var(--edge); }
+.job-top { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.tone-chip { font-family: var(--mono); font-size: 10.5px; padding: 2px 7px; border-radius: 10px; letter-spacing: 0.03em; }
+.tone-chip.spy { background: rgba(90,74,134,0.35); color: #cbb8ff; border: 1px solid #5b4a86; }
+.tone-chip.grounded { background: rgba(255,178,0,0.14); color: #ffcf6b; border: 1px solid #6b5320; }
+.job-city { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-left: auto; }
+.job-top .stars { margin-left: 0; }
+.job-title { font-family: var(--display); font-size: 17px; letter-spacing: 0.02em; color: var(--bone); margin: 0; }
+.job-giver { font-family: var(--mono); font-size: 11px; color: var(--amber); margin: 2px 0 6px; }
+.job-brief { font-family: var(--mono); font-size: 12px; line-height: 1.55; color: var(--muted); margin: 0 0 10px; }
+.job-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.job-reward { font-family: var(--mono); font-size: 13px; font-weight: 700; color: var(--amber); }
+.job-lock { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+
+.stars { display: inline-flex; gap: 1px; }
+.star { color: #3a3f4a; font-size: 14px; line-height: 1; }
+.star.on { color: #ffd23f; }
+
+.shop-section { font-family: var(--display); letter-spacing: 0.05em; text-transform: uppercase; font-size: 13px;
+  color: var(--bone); margin-top: 10px; }
+.shop-section span { color: var(--muted); font-family: var(--mono); font-size: 10.5px; letter-spacing: 0; text-transform: none; }
+.shop-row { display: flex; align-items: center; gap: 10px; background: var(--panel-2); border: 1px solid var(--edge);
+  border-radius: 4px; padding: 8px 12px; }
+.shop-info { flex: 1; display: flex; flex-direction: column; font-family: var(--mono); }
+.shop-info b { font-size: 13px; color: var(--bone); }
+.shop-desc { font-size: 10.5px; color: var(--muted); }
+.shop-owned, .shop-on { font-family: var(--mono); font-size: 11px; color: #28c76f; }
+.dot-swatch { width: 20px; height: 20px; border-radius: 50%; border: 2px solid #0b0d11; box-shadow: 0 0 0 1px var(--edge); flex: none; }
+.title-swatch { font-size: 16px; width: 20px; text-align: center; flex: none; }
+
+.career-reward { text-align: center; }
+.career-reward .reward-stars .star { font-size: 34px; }
+.reward-pay { font-family: var(--display); font-size: 30px; color: var(--amber); margin: 8px 0 4px; letter-spacing: 0.04em; }

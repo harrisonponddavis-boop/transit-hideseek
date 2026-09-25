@@ -166,12 +166,15 @@ function hiderDistFrom(game, pos) {
 
 // --- Solo mode: an AI hider ("The Phantom") picks a spot and sends one photo ---
 
-function createSoloGame(hostId, hostName, photoAvailable, cityId = DEFAULT_CITY, study = false) {
+function createSoloGame(hostId, hostName, photoAvailable, cityId = DEFAULT_CITY, study = false, bonusCoins = 0) {
   const g = createGame(hostId, hostName, cityId);
   g.solo = true;
   g.study = !!study; // study mode: riding pays nothing; you earn coins by quizzing yourself
   g.photoAvailable = !!photoAvailable;
   g.photoUsed = false;
+  // career-mode perks can grant a starting-coin head start (0 in normal play)
+  const bonus = Math.max(0, Math.min(30, Math.floor(Number(bonusCoins) || 0)));
+  if (bonus) g.coins += bonus;
   g.players[0].role = 'seeker';
   g.players.push({ id: SOLO.BOT_ID, name: SOLO.BOT_NAME, role: 'hider' });
   return g;

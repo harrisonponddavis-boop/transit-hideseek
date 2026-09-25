@@ -129,11 +129,11 @@ io.on('connection', (socket) => {
     broadcast(g);
   });
 
-  socket.on('createSolo', async ({ name, cityId, study }, cb) => {
+  socket.on('createSolo', async ({ name, cityId, study, bonusCoins }, cb) => {
     if (games.size >= MAX_ROOMS) return cb({ error: 'Server is full — try again in a bit' });
     playerId = socket.id;
     socketsByPlayer.set(playerId, socket);
-    const g = createSoloGame(playerId, (name || 'Seeker').slice(0, 20), !!STREET_VIEW_KEY, cityId, !!study);
+    const g = createSoloGame(playerId, (name || 'Seeker').slice(0, 20), !!STREET_VIEW_KEY, cityId, !!study, bonusCoins);
     games.set(g.code, g);
     gameCode = g.code;
     await placeSoloHider(g, STREET_VIEW_KEY);

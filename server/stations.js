@@ -105,11 +105,63 @@ function haversineMeters(lat1, lng1, lat2, lng2) {
   return 2 * R * Math.asin(Math.sqrt(a));
 }
 
+// ---- Custom (player-made) maps ----------------------------------------
+// Turn a raw map definition (from the in-app Map Maker) into a playable city,
+// validating and clamping everything and filling in travel times from distance.
+function sanitizeColor(c) {
+  return typeof c === 'string' && /^#[0-9a-fA-F]{6}$/.test(c) ? c : '#4b9fff';
+}
+function buildCustomCity(raw) {
+  if (!raw || typeof raw !== 'object') throw new Error('bad map');
+  const stations = {};
+  const rawStations = raw.stations && typeof raw.stations === 'object' ? raw.stations : {};
+  for (const id of Object.keys(rawStations).slice(0, 250)) {
+    const s = rawStations[id];
+    if (!s || typeof s.lat !== 'number' || typeof s.lng !== 'number') continue;
+    if (Math.abs(s.lat) > 90 || Math.abs(s.lng) > 180) continue;
+    stations[id] = { id, name: String(s.name || id).slice(0, 40), lat: s.lat, lng: s.lng };
+    if (s.region) stations[id].region = String(s.region).slice(0, 40);
+  }
+  const ids = Object.keys(stations);
+  if (ids.length < 2) throw new Error('a map needs at least 2 stations');
+
+  const lines = (Array.isArray(raw.lines) ? raw.lines : []).slice(0, 40).map((l, li) => {
+    const stops = (Array.isArray(l.stops) ? l.stops : []).filter((id) => stations[id]);
+    const hops = [];
+    for (let i = 0; i < stops.length - 1; i++) {
+      const a = stations[stops[i]], b = stations[stops[i + 1]];
+      const km = haversineMeters(a.lat, a.lng, b.lat, b.lng) / 1000;
+      hops.push(Math.max(1, Math.round(km * 2))); // ~30 km/h incl. stops
+    }
+    return { id: l.id || `L${li}`, name: String(l.name || `Line ${li + 1}`).slice(0, 40),
+      color: sanitizeColor(l.color), stops, hops };
+  }).filter((l) => l.stops.length >= 2);
+  if (!lines.length) throw new Error('a map needs at least one line connecting 2+ stations');
+
+  const cLat = ids.reduce((s, id) => s + stations[id].lat, 0) / ids.length;
+  const cLng = ids.reduce((s, id) => s + stations[id].lng, 0) / ids.length;
+  const startStation = stations[raw.startStation] ? raw.startStation : lines[0].stops[0];
+
+  const def = {
+    id: 'custom', name: String(raw.name || 'Custom Map').slice(0, 40),
+    center: [cLat, cLng], zoom: Number(raw.zoom) || 12,
+    startStation, stations, lines,
+    stationRegions: raw.stationRegions && typeof raw.stationRegions === 'object' ? raw.stationRegions : undefined,
+    pois: Array.isArray(raw.pois) ? raw.pois.slice(0, 60) : [],
+    vehicle: raw.vehicle === 'bus' ? 'bus' : 'train',
+    custom: true,
+  };
+  const city = buildCity(def);
+  city.custom = true;
+  return city;
+}
+
 // Backward-compatible SF exports (used by older tests that predate multi-city)
 const sf = CITIES[DEFAULT_CITY];
 
 module.exports = {
   getCity, listCities, CITIES, DEFAULT_CITY, haversineMeters,
+  buildCity, buildCustomCity,
   STATIONS: sf.stations,
   LINES: sf.lines,
   STATION_LINES: sf.stationLines,

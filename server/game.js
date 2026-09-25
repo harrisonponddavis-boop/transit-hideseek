@@ -3,8 +3,8 @@
 
 const { getCity, DEFAULT_CITY, haversineMeters } = require('./stations');
 
-// The city for a given game (each game stores its own cityId)
-const cityOf = (game) => getCity(game.cityId);
+// The city for a given game (custom maps carry their built city on the game)
+const cityOf = (game) => game.customCity || getCity(game.cityId);
 
 const RULES = {
   HIDE_ZONE_METERS: 500,   // hiding spot must be this close to chosen station
@@ -118,11 +118,12 @@ function makeCode() {
   return code;
 }
 
-function createGame(hostId, hostName, cityId = DEFAULT_CITY) {
-  const city = getCity(cityId);
-  return {
+function createGame(hostId, hostName, cityId = DEFAULT_CITY, customCity = null) {
+  const city = customCity || getCity(cityId);
+  const g = {
     code: makeCode(),
-    cityId: city.id,
+    cityId: customCity ? cityId : city.id,
+    customCity: customCity || undefined,
     phase: 'lobby', // lobby -> hiding -> seeking -> ended
     hostId,
     players: [{ id: hostId, name: hostName, role: 'hider' }],
@@ -140,6 +141,7 @@ function createGame(hostId, hostName, cityId = DEFAULT_CITY) {
     pendingPhoto: null, // { kind, feedIndex } while the hider owes a screenshot
     winner: null,
   };
+  return g;
 }
 
 // Where the seekers actually stand: walked position, else their station
@@ -166,8 +168,8 @@ function hiderDistFrom(game, pos) {
 
 // --- Solo mode: an AI hider ("The Phantom") picks a spot and sends one photo ---
 
-function createSoloGame(hostId, hostName, photoAvailable, cityId = DEFAULT_CITY, study = false, bonusCoins = 0) {
-  const g = createGame(hostId, hostName, cityId);
+function createSoloGame(hostId, hostName, photoAvailable, cityId = DEFAULT_CITY, study = false, bonusCoins = 0, customCity = null) {
+  const g = createGame(hostId, hostName, cityId, customCity);
   g.solo = true;
   g.study = !!study; // study mode: riding pays nothing; you earn coins by quizzing yourself
   g.photoAvailable = !!photoAvailable;

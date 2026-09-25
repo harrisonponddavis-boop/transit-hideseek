@@ -74,3 +74,23 @@ export async function fetchLeaderboard(city) {
     return Array.isArray(d.scores) ? d.scores : [];
   } catch { return []; }
 }
+
+// Player-made maps (Map Maker)
+export async function saveMap(name, def, id) {
+  try { return await jsonPost('/me/maps', { name, def, id }, true); }
+  catch { return { error: 'offline' }; }
+}
+export async function listMyMaps() {
+  try {
+    const r = await fetch('/me/maps', { headers: { Authorization: `Bearer ${getToken()}` } });
+    if (r.status === 401) { clearSession(); return []; }
+    const d = await r.json();
+    return Array.isArray(d.maps) ? d.maps : [];
+  } catch { return []; }
+}
+export async function deleteMap(id) {
+  try {
+    await fetch(`/me/maps/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${getToken()}` } });
+    return { ok: true };
+  } catch { return { error: 'offline' }; }
+}

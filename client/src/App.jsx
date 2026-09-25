@@ -13,6 +13,8 @@ import {
 import CareerHub, { CareerReward } from './CareerHub';
 import Leaderboard from './Leaderboard';
 import Tutorial from './Tutorial';
+import MapMaker from './MapMaker';
+import { buildCustomNetwork } from './custommap';
 import {
   loadCareer, saveCareerLocal, normalizeCareer, starsFor, payoutFor,
   effectiveBonusCoins, JOBS,
@@ -41,6 +43,7 @@ export default function App() {
   const [careerMode, setCareerMode] = useState(false); // showing the career hub
   const [boardMode, setBoardMode] = useState(false); // showing the leaderboards
   const [tutorialMode, setTutorialMode] = useState(false); // running the interactive tutorial
+  const [makerMode, setMakerMode] = useState(false); // showing the map maker
   const [career, setCareer] = useState(() => loadCareer()); // career/story profile
   const [careerReward, setCareerReward] = useState(null); // { job, stars, payout }
   const [activeJob, setActiveJob] = useState(null); // career job being played (for mission UI)
@@ -135,6 +138,15 @@ export default function App() {
     setNetwork(null);
   };
 
+  // Play a player-made map: set the network locally, then start a custom solo hunt.
+  const playCustomMap = async (def) => {
+    setImmersive(true);
+    setNetwork(buildCustomNetwork(def));
+    setMakerMode(false);
+    const r = await send('createSolo', { name: user || 'Seeker', map: def });
+    if (r?.error) { flash(r.error); setState(null); setNetwork(null); }
+  };
+
   // Start a career job: launch a solo hunt in the job's city with any perk bonus.
   const playJob = async (job) => {
     activeJobRef.current = job;
@@ -158,7 +170,7 @@ export default function App() {
   // load the right city's network whenever the game's city is known/changes
   const cityId = state?.cityId;
   useEffect(() => {
-    if (!cityId) return;
+    if (!cityId || cityId === 'custom') return; // custom maps set network locally
     let alive = true;
     fetch(`/network/${cityId}`).then((r) => r.json()).then((n) => alive && setNetwork(n));
     return () => { alive = false; };
@@ -200,10 +212,11 @@ export default function App() {
   const seekerSeeking = state && state.phase === 'seeking' && state.you.role === 'seeker';
 
   let view, immersiveActive = false;
-  if (!state && careerMode) view = <CareerHub career={career} commit={commitCareer} onPlayJob={playJob} onExit={() => setCareerMode(false)} />;
+  if (!state && makerMode) view = <MapMaker user={user} accounts={accounts} onPlay={playCustomMap} onExit={() => setMakerMode(false)} />;
+  else if (!state && careerMode) view = <CareerHub career={career} commit={commitCareer} onPlayJob={playJob} onExit={() => setCareerMode(false)} />;
   else if (!state && boardMode) view = <Leaderboard user={user} onExit={() => setBoardMode(false)} />;
   else if (!state) view = <Home flash={flash} user={user} accounts={accounts} onAuthed={handleAuthed} onLogout={handleLogout}
-    onCareer={() => setCareerMode(true)} onBoard={() => setBoardMode(true)} onTutorial={startTutorial} />;
+    onCareer={() => setCareerMode(true)} onBoard={() => setBoardMode(true)} onTutorial={startTutorial} onMaker={() => setMakerMode(true)} />;
   else if (state.phase === 'lobby') view = <Lobby state={state} act={act} />;
   else if (state.phase === 'hiding')
     view = state.you.role === 'hider'
@@ -254,7 +267,7 @@ function Board({ state, network, theme, setTheme }) {
   );
 }
 
-function Home({ flash, user, accounts, onAuthed, onLogout, onCareer, onBoard, onTutorial }) {
+function Home({ flash, user, accounts, onAuthed, onLogout, onCareer, onBoard, onTutorial, onMaker }) {
   const [name, setName] = useState(() => user || '');
   const [code, setCode] = useState('');
   const [cities, setCities] = useState([]);
@@ -360,6 +373,11 @@ function Home({ flash, user, accounts, onAuthed, onLogout, onCareer, onBoard, on
                 <span className="mt-icon">📝</span>
                 <span className="mt-name">Study mode</span>
                 <span className="mt-sub">Earn coins on your own quiz</span>
+              </button>
+              <button className="mode-tile maker" onClick={onMaker}>
+                <span className="mt-icon">🗺️</span>
+                <span className="mt-name">Map Maker</span>
+                <span className="mt-sub">Build & play your own map</span>
               </button>
               {accounts && (
                 <button className="mode-tile board" onClick={onBoard}>

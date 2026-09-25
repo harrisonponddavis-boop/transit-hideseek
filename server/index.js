@@ -3,7 +3,7 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 
-const { getCity, listCities } = require('./stations');
+const { getCity, listCities, buildCustomCity } = require('./stations');
 const {
   createGame, setOptions, setHider, move, walk, ask, guess, photoReply, viewFor, PHOTO_KINDS,
   board, disembark,
@@ -77,6 +77,18 @@ app.get('/leaderboard/:city', h(async (req, res) => {
   res.json({ scores: await auth.topScores(req.params.city, 20) });
 }));
 
+// Player-made maps
+app.get('/me/maps', requireAuth, h(async (req, res) => {
+  res.json({ maps: await auth.listMyMaps(req.uid) });
+}));
+app.post('/me/maps', requireAuth, h(async (req, res) => {
+  const { name, def, id } = req.body || {};
+  res.json(await auth.saveMap(req.uid, name, def, id));
+}));
+app.delete('/me/maps/:id', requireAuth, h(async (req, res) => {
+  res.json(await auth.deleteMap(req.uid, req.params.id));
+}));
+
 // City list for the picker, and per-city network for the map
 app.get('/cities', (_req, res) => res.json(listCities()));
 app.get('/network/:cityId', (req, res) => {
@@ -137,11 +149,19 @@ io.on('connection', (socket) => {
     broadcast(g);
   });
 
-  socket.on('createSolo', async ({ name, cityId, study, bonusCoins, tutorial }, cb) => {
+  socket.on('createSolo', async ({ name, cityId, study, bonusCoins, tutorial, map }, cb) => {
     if (games.size >= MAX_ROOMS) return cb({ error: 'Server is full — try again in a bit' });
     playerId = socket.id;
     socketsByPlayer.set(playerId, socket);
-    const g = createSoloGame(playerId, (name || 'Seeker').slice(0, 20), !!STREET_VIEW_KEY, cityId, !!study, bonusCoins);
+    let customCity = null;
+    if (map) {
+      try { customCity = buildCustomCity(map); }
+      catch (e) { return cb({ error: `Map problem: ${e.message}` }); }
+    }
+    const g = createSoloGame(
+      playerId, (name || 'Seeker').slice(0, 20), !!STREET_VIEW_KEY,
+      customCity ? 'custom' : cityId, !!study, bonusCoins, customCity
+    );
     games.set(g.code, g);
     gameCode = g.code;
     if (tutorial) placeTutorialHider(g);           // controlled, always-winnable first hunt

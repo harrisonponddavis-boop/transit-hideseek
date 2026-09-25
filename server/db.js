@@ -62,6 +62,19 @@ async function init() {
       );
     `);
     await pool.query(`CREATE INDEX IF NOT EXISTS leaderboard_city_mins ON leaderboard (city, mins);`);
+    // Player-made maps (Map Maker). def holds the full map definition.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS maps (
+        id         SERIAL PRIMARY KEY,
+        owner_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name       TEXT NOT NULL,
+        def        JSONB NOT NULL,
+        is_public  BOOLEAN NOT NULL DEFAULT false,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS maps_owner ON maps (owner_id);`);
     ready = true;
     console.log('[db] accounts ENABLED — schema ready');
     return true;

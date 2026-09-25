@@ -135,7 +135,43 @@ async function topScores(city, limit = 20) {
   return res.rows.map((r) => ({ username: r.username, mins: r.mins }));
 }
 
+// ---- Player-made maps ---------------------------------------------------
+async function saveMap(uid, name, def, id) {
+  name = String(name || 'Custom Map').slice(0, 40);
+  const json = JSON.stringify(def || {});
+  if (json.length > 400000) return { error: 'That map is too large to save' };
+  if (id) {
+    const res = await db.query(
+      `UPDATE maps SET name = $1, def = $2::jsonb, updated_at = now()
+       WHERE id = $3 AND owner_id = $4 RETURNING id`,
+      [name, json, id, uid]
+    );
+    if (!res.rowCount) return { error: 'Map not found' };
+    return { ok: true, id: res.rows[0].id };
+  }
+  const cnt = await db.query('SELECT count(*)::int AS n FROM maps WHERE owner_id = $1', [uid]);
+  if (cnt.rows[0].n >= 50) return { error: 'You have hit the 50-map limit — delete one first' };
+  const ins = await db.query(
+    'INSERT INTO maps (owner_id, name, def) VALUES ($1, $2, $3::jsonb) RETURNING id',
+    [uid, name, json]
+  );
+  return { ok: true, id: ins.rows[0].id };
+}
+
+async function listMyMaps(uid) {
+  const res = await db.query(
+    'SELECT id, name, def, is_public, updated_at FROM maps WHERE owner_id = $1 ORDER BY updated_at DESC',
+    [uid]
+  );
+  return res.rows.map((r) => ({ id: r.id, name: r.name, def: r.def, isPublic: r.is_public }));
+}
+
+async function deleteMap(uid, id) {
+  const res = await db.query('DELETE FROM maps WHERE id = $1 AND owner_id = $2', [id, uid]);
+  return { ok: !!res.rowCount };
+}
+
 module.exports = {
   sign, verifyToken, register, login, getData, saveData, recordGame,
-  recordScore, topScores,
+  recordScore, topScores, saveMap, listMyMaps, deleteMap,
 };

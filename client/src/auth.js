@@ -61,3 +61,16 @@ export async function recordGame(result) {
   try { return await jsonPost('/me/game', result, true); }
   catch { return { error: 'offline' }; }
 }
+
+// Leaderboards: submit a finished solo time (authed), read a city's top times (public).
+export async function submitScore(city, mins) {
+  try { return await jsonPost('/me/score', { city, mins }, true); }
+  catch { return { error: 'offline' }; }
+}
+export async function fetchLeaderboard(city) {
+  try {
+    const r = await fetch(`/leaderboard/${encodeURIComponent(city)}`);
+    const d = await r.json();
+    return Array.isArray(d.scores) ? d.scores : [];
+  } catch { return []; }
+}

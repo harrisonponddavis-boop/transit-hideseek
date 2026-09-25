@@ -50,6 +50,18 @@ async function init() {
     `);
     // Career/story-mode progress (added later; additive + idempotent).
     await pool.query(`ALTER TABLE user_data ADD COLUMN IF NOT EXISTS career JSONB NOT NULL DEFAULT '{}'::jsonb;`);
+    // Per-city best solo times (leaderboards). One row per player per city.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS leaderboard (
+        user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        city       TEXT NOT NULL,
+        username   TEXT NOT NULL,
+        mins       INTEGER NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        PRIMARY KEY (user_id, city)
+      );
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS leaderboard_city_mins ON leaderboard (city, mins);`);
     ready = true;
     console.log('[db] accounts ENABLED — schema ready');
     return true;

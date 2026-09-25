@@ -8,9 +8,10 @@ import ImmersiveView from './ImmersiveView';
 import { loadStudyQuestions, saveStudyQuestions } from './study';
 import {
   getUsername, isSignedIn, register, login, clearSession,
-  fetchMyData, saveMyData, recordGame,
+  fetchMyData, saveMyData, recordGame, submitScore,
 } from './auth';
 import CareerHub, { CareerReward } from './CareerHub';
+import Leaderboard from './Leaderboard';
 import {
   loadCareer, saveCareerLocal, normalizeCareer, starsFor, payoutFor,
   effectiveBonusCoins, JOBS,
@@ -37,6 +38,7 @@ export default function App() {
   const [user, setUser] = useState(() => getUsername() || null); // signed-in username
   const [accounts, setAccounts] = useState(false); // is the account system live?
   const [careerMode, setCareerMode] = useState(false); // showing the career hub
+  const [boardMode, setBoardMode] = useState(false); // showing the leaderboards
   const [career, setCareer] = useState(() => loadCareer()); // career/story profile
   const [careerReward, setCareerReward] = useState(null); // { job, stars, payout }
   const activeJobRef = useRef(null); // the career job currently being played
@@ -157,6 +159,8 @@ export default function App() {
         recordedRef.current = true;
         const won = state.feed?.some((f) => f.kind === 'guess' && f.hit);
         recordGame({ won: !!won, coins: state.coins, city: state.cityId });
+        // leaderboards: only comparable solo, non-study wins count
+        if (won && state.solo && !state.study) submitScore(state.cityId, state.clock);
       }
     } else {
       recordedRef.current = false;
@@ -178,7 +182,9 @@ export default function App() {
 
   let view, immersiveActive = false;
   if (!state && careerMode) view = <CareerHub career={career} commit={commitCareer} onPlayJob={playJob} onExit={() => setCareerMode(false)} />;
-  else if (!state) view = <Home flash={flash} user={user} accounts={accounts} onAuthed={handleAuthed} onLogout={handleLogout} onCareer={() => setCareerMode(true)} />;
+  else if (!state && boardMode) view = <Leaderboard user={user} onExit={() => setBoardMode(false)} />;
+  else if (!state) view = <Home flash={flash} user={user} accounts={accounts} onAuthed={handleAuthed} onLogout={handleLogout}
+    onCareer={() => setCareerMode(true)} onBoard={() => setBoardMode(true)} />;
   else if (state.phase === 'lobby') view = <Lobby state={state} act={act} />;
   else if (state.phase === 'hiding')
     view = state.you.role === 'hider'
@@ -228,7 +234,7 @@ function Board({ state, network, theme, setTheme }) {
   );
 }
 
-function Home({ flash, user, accounts, onAuthed, onLogout, onCareer }) {
+function Home({ flash, user, accounts, onAuthed, onLogout, onCareer, onBoard }) {
   const [name, setName] = useState(() => user || '');
   const [code, setCode] = useState('');
   const [cities, setCities] = useState([]);
@@ -309,6 +315,7 @@ function Home({ flash, user, accounts, onAuthed, onLogout, onCareer }) {
         <div className="row" style={{ marginTop: 10 }}>
           <button className="ghost small" onClick={() => setShowHelp(true)}>？ How to play</button>
           <button className="ghost small" onClick={() => setShowStudy(true)}>Edit study questions</button>
+          {accounts && <button className="ghost small" onClick={onBoard}>🏆 Leaderboards</button>}
         </div>
         <div className="divider">or join one</div>
         <div className="row">

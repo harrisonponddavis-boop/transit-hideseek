@@ -108,4 +108,34 @@ async function recordGame(uid, { won, coins, city } = {}) {
   return { ok: true, stats: s };
 }
 
-module.exports = { sign, verifyToken, register, login, getData, saveData, recordGame };
+// Record a finished solo run's time; keeps only each player's best per city.
+async function recordScore(uid, username, city, mins) {
+  city = String(city || '').slice(0, 40);
+  mins = Math.round(Number(mins));
+  if (!city || !Number.isFinite(mins) || mins < 0 || mins > 100000) return { ok: false };
+  await db.query(
+    `INSERT INTO leaderboard (user_id, city, username, mins, updated_at)
+     VALUES ($1, $2, $3, $4, now())
+     ON CONFLICT (user_id, city) DO UPDATE
+       SET mins = LEAST(leaderboard.mins, EXCLUDED.mins),
+           username = EXCLUDED.username,
+           updated_at = now()`,
+    [uid, city, username, mins]
+  );
+  return { ok: true };
+}
+
+// Public: the fastest times for a city (lowest minutes first).
+async function topScores(city, limit = 20) {
+  const res = await db.query(
+    `SELECT username, mins, updated_at FROM leaderboard
+     WHERE city = $1 ORDER BY mins ASC, updated_at ASC LIMIT $2`,
+    [String(city || '').slice(0, 40), Math.min(50, Math.max(1, limit | 0))]
+  );
+  return res.rows.map((r) => ({ username: r.username, mins: r.mins }));
+}
+
+module.exports = {
+  sign, verifyToken, register, login, getData, saveData, recordGame,
+  recordScore, topScores,
+};

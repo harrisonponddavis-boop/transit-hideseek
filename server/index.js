@@ -68,6 +68,14 @@ app.put('/me/data', requireAuth, h(async (req, res) => {
 app.post('/me/game', requireAuth, h(async (req, res) => {
   res.json(await auth.recordGame(req.uid, req.body || {}));
 }));
+app.post('/me/score', requireAuth, h(async (req, res) => {
+  const { city, mins } = req.body || {};
+  res.json(await auth.recordScore(req.uid, req.username, city, mins));
+}));
+app.get('/leaderboard/:city', h(async (req, res) => {
+  if (!db.enabled) return res.json({ scores: [] });
+  res.json({ scores: await auth.topScores(req.params.city, 20) });
+}));
 
 // City list for the picker, and per-city network for the map
 app.get('/cities', (_req, res) => res.json(listCities()));

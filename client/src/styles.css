@@ -1095,3 +1095,13 @@ a { color: var(--amber); }
 .career-reward { text-align: center; }
 .career-reward .reward-stars .star { font-size: 34px; }
 .reward-pay { font-family: var(--display); font-size: 30px; color: var(--amber); margin: 8px 0 4px; letter-spacing: 0.04em; }
+
+/* leaderboards */
+.lb-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.lb-row { display: flex; align-items: center; gap: 12px; padding: 9px 12px; background: var(--panel-2);
+  border: 1px solid var(--edge); border-radius: 4px; font-family: var(--mono); }
+.lb-row.top { border-color: #6b5320; }
+.lb-row.me { border-color: var(--amber); background: rgba(255,178,0,0.10); }
+.lb-rank { width: 26px; text-align: center; font-weight: 700; color: var(--muted); font-size: 13px; }
+.lb-name { flex: 1; color: var(--bone); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lb-mins { color: var(--amber); font-weight: 700; font-size: 13px; }

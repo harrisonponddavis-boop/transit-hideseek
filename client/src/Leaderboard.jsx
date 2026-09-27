@@ -3,6 +3,8 @@ import { fetchLeaderboard } from './auth';
 
 // Per-city fastest solo runs (in-game minutes). Reading is public; your own
 // times appear here once you play a solo hunt while signed in.
+const ROMAN = ['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII','XIII','XIV','XV','XVI','XVII','XVIII','XIX','XX'];
+
 export default function Leaderboard({ user, onExit }) {
   const [cities, setCities] = useState([]);
   const [city, setCity] = useState('sf');
@@ -32,7 +34,7 @@ export default function Leaderboard({ user, onExit }) {
           <button className="ghost small" onClick={onExit}>← Home</button>
           <span className="cw-title">🏆 fastest hunts</span>
         </div>
-        <h2 className="career-h">Leaderboards</h2>
+        <h2 className="career-h">The Hall of Records</h2>
         <p className="tag" style={{ marginTop: -4 }}>
           The quickest solo catches in each city, measured in game-minutes. Sign in and
           win a solo hunt to put your time on the board.
@@ -57,7 +59,8 @@ export default function Leaderboard({ user, onExit }) {
             <ol className="lb-list">
               {scores.map((s, i) => (
                 <li key={i} className={`lb-row ${s.username === user ? 'me' : ''} ${i < 3 ? 'top' : ''}`}>
-                  <span className="lb-rank">{i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}</span>
+                  <span className="lb-rank">{ROMAN[i] || i + 1}</span>
+                  <span className="lb-medal">{i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : ''}</span>
                   <span className="lb-name">{s.username}{s.username === user ? ' (you)' : ''}</span>
                   <span className="lb-mins">{s.mins} min</span>
                 </li>

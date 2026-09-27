@@ -35,7 +35,7 @@ export default function App() {
   const [state, setState] = useState(null); // server view of the game
   const [network, setNetwork] = useState(null);
   const [toast, setToast] = useState(null);
-  const [theme, setTheme] = useState(() => localStorage.getItem('ths-theme') || 'dark');
+  const [theme, setTheme] = useState(() => localStorage.getItem('ths-map-theme') || 'light');
   const [embedKey, setEmbedKey] = useState('');
   const [immersive, setImmersive] = useState(true); // seeker's default main screen
   const [user, setUser] = useState(() => getUsername() || null); // signed-in username
@@ -76,7 +76,7 @@ export default function App() {
       if (!data) { setUser(null); }
       else {
         if (Array.isArray(data.studyQuestions)) saveStudyQuestions(data.studyQuestions);
-        if (data.prefs?.theme) setTheme(data.prefs.theme);
+        if (data.prefs?.mapTheme) setTheme(data.prefs.mapTheme);
         if (data.career && Object.keys(data.career).length) {
           const c = normalizeCareer(data.career);
           setCareer(c); saveCareerLocal(c);
@@ -114,7 +114,7 @@ export default function App() {
     } else {
       saveStudyQuestions(data.studyQuestions || []);
     }
-    if (data.prefs?.theme) setTheme(data.prefs.theme);
+    if (data.prefs?.mapTheme) setTheme(data.prefs.mapTheme);
     if (data.career && Object.keys(data.career).length) {
       const c = normalizeCareer(data.career);
       setCareer(c); saveCareerLocal(c);
@@ -185,9 +185,9 @@ export default function App() {
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
-    localStorage.setItem('ths-theme', theme);
+    localStorage.setItem('ths-map-theme', theme);
     // once we've pulled the account down, keep the server copy of the theme in step
-    if (syncedRef.current && isSignedIn()) saveMyData({ prefs: { theme } });
+    if (syncedRef.current && isSignedIn()) saveMyData({ prefs: { mapTheme: theme } });
   }, [theme]);
 
   // When a game finishes, log the result to the signed-in player's lifetime stats.
@@ -267,7 +267,7 @@ function Board({ state, network, theme, setTheme }) {
         )}
         {state && <div><span className="lbl">Room</span><b>{state.code}</b></div>}
         <button className="ghost small" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
-          {theme === 'dark' ? '☀ Light' : '☾ Dark'}
+          {theme === 'dark' ? '☀ Day maps' : '☾ Night maps'}
         </button>
       </div>
     </header>
@@ -307,8 +307,8 @@ function Home({ flash, user, accounts, onAuthed, onLogout, onCareer, onBoard, on
       <div className="home-card">
         <div className="home-head">
           <div className="home-title">
-            <h2>Now Boarding</h2>
-            <p className="tag">One player hides near a station. Ride real transit, spend coins on
+            <h2>Transit <span>Hide+Seek</span></h2>
+            <p className="tag">Now boarding — one player hides near a station. Ride real transit, spend coins on
               questions, and drop a pin within metres of them to win.</p>
           </div>
           {accounts && (
@@ -592,7 +592,7 @@ function Lobby({ state, act }) {
   return (
     <div className="center-stage">
       <div className="card">
-        <h2>Platform Lobby</h2>
+        <h2>The Briefing Room</h2>
         <p className="tag">Share this code. Friends join from any device.</p>
         <div className="code-display">{state.code}</div>
         <div className="roster">

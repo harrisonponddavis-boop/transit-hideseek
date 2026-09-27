@@ -157,6 +157,13 @@ export default function App() {
     });
     if (r?.error) { flash(r.error); activeJobRef.current = null; }
   };
+  // "Explore the city" from the story map: an unpaid solo hunt there.
+  const playFreeRoam = async (cityId) => {
+    activeJobRef.current = null;
+    setActiveJob(null);
+    const r = await send('createSolo', { name: user || 'Agent', cityId });
+    if (r?.error) flash(r.error);
+  };
   // Leave a finished job and return to the hub.
   const leaveJob = () => {
     activeJobRef.current = null;
@@ -213,7 +220,7 @@ export default function App() {
 
   let view, immersiveActive = false;
   if (!state && makerMode) view = <MapMaker user={user} accounts={accounts} onPlay={playCustomMap} onExit={() => setMakerMode(false)} />;
-  else if (!state && careerMode) view = <CareerHub career={career} commit={commitCareer} onPlayJob={playJob} onExit={() => setCareerMode(false)} />;
+  else if (!state && careerMode) view = <CareerHub career={career} commit={commitCareer} onPlayJob={playJob} onFreeRoam={playFreeRoam} onExit={() => setCareerMode(false)} />;
   else if (!state && boardMode) view = <Leaderboard user={user} onExit={() => setBoardMode(false)} />;
   else if (!state) view = <Home flash={flash} user={user} accounts={accounts} onAuthed={handleAuthed} onLogout={handleLogout}
     onCareer={() => setCareerMode(true)} onBoard={() => setBoardMode(true)} onTutorial={startTutorial} onMaker={() => setMakerMode(true)} />;

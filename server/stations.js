@@ -91,7 +91,7 @@ function getCity(cityId) {
 }
 
 function listCities() {
-  return CITY_DEFS.map((d) => ({ id: d.id, name: d.name }));
+  return CITY_DEFS.map((d) => ({ id: d.id, name: d.name, center: d.center }));
 }
 
 function haversineMeters(lat1, lng1, lat2, lng2) {

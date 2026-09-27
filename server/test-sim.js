@@ -282,6 +282,20 @@ assert(r.hit, '33m pin should win at the 50m setting');
 assert(viewFor(g2, 'S2').rules.WIN_RADIUS_METERS === 50);
 console.log('✓ lobby-configurable tag distance (33m pin wins at 50m setting)');
 
+// --- Tutorial: target hides a couple of stops away, not at the start ---
+{
+  const { createSoloGame, placeTutorialHider, move: mv, guess: gs, viewFor: vf } = require('./game');
+  const tg = createSoloGame('rookie', 'Rookie', false, 'sf');
+  placeTutorialHider(tg);
+  assert.notStrictEqual(tg.hider.stationId, 'EMB', 'tutorial hider must not be at the start station');
+  assert.strictEqual(tg.hider.stationId, 'POWL');
+  assert.strictEqual(vf(tg, 'rookie').tutorialTarget, 'POWL');
+  mv(tg, 'POWL');
+  const st = STATIONS.POWL;
+  assert(gs(tg, st.lat + 0.0004, st.lng).hit, 'tutorial catch is forgiving (~45m off still wins)');
+  console.log('✓ tutorial: hider two stops away at Powell, target shown, forgiving catch');
+}
+
 // --- Solo mode: AI hider + one Street View photo ---
 async function testSolo() {
   const { createSoloGame, placeSoloHider, soloPhoto, RULES: R } = require('./game');

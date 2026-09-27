@@ -4,7 +4,7 @@
     {
       "name": "transit-hideseek",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "/Users/andrewdavis/Documents/Code/transit-hideseek", "run", "dev"],
+      "runtimeArgs": ["--prefix", "/Users/harrisondavis/Claude/transit-hideseek", "run", "dev"],
       "port": 5173
     }
   ]

@@ -244,11 +244,26 @@ async function placeSoloHider(game, key) {
 
 // Tutorial: place the target right at the start station so the guided first
 // hunt is short and always winnable.
+// The tutorial's target hides a couple of stops down the first line out of the
+// start station, right at that station — so the rookie has to learn to ride
+// there, confirm the station, and tag them. A generous win radius keeps it
+// always winnable wherever Street View drops them on arrival.
 function placeTutorialHider(game) {
   const city = cityOf(game);
-  const s = city.stations[city.startStation];
+  const start = city.startStation;
+  const line = city.lines.find((l) => l.stops.includes(start) && l.stops.length > 1);
+  let target = start;
+  if (line) {
+    const i = line.stops.indexOf(start);
+    const fwd = line.stops[Math.min(i + 2, line.stops.length - 1)];
+    const back = line.stops[Math.max(i - 2, 0)];
+    target = fwd !== start ? fwd : back;
+  }
+  const s = city.stations[target];
   game.tutorial = true;
-  return setHider(game, SOLO.BOT_ID, city.startStation, s.lat, s.lng);
+  const r = setHider(game, SOLO.BOT_ID, target, s.lat, s.lng);
+  game.winRadius = 100;
+  return r;
 }
 
 // The one photo per game: a real Street View image of the hiding spot
@@ -640,6 +655,8 @@ function viewFor(game, playerId) {
     winner: game.winner,
     rules: { ...RULES, WIN_RADIUS_METERS: game.winRadius },
   };
+  // the tutorial openly tells the rookie which station to ride to
+  if (game.tutorial && game.hider) base.tutorialTarget = game.hider.stationId;
   // Hider location revealed only to the hider, or to everyone once the game ends
   if (isHider || game.phase === 'ended') base.hider = game.hider;
   // Travel times from the seekers' current station (for the move UI),

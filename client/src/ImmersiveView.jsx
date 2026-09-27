@@ -4,6 +4,7 @@ import { isPointPossible, possibleStations, geoConstraints, metersBetween, beari
 import { loadStudyQuestions } from './study';
 import { RadioBubble } from './Radio';
 import MapView from './MapView';
+import { emitUi } from './uiBus';
 
 const RADARS = [{ km: 0.5, c: 5 }, { km: 1, c: 4 }, { km: 2, c: 3 }, { km: 5, c: 2 }];
 const BOARD_RADIUS = 35;   // metres you must be within to board (~100 ft)
@@ -56,6 +57,8 @@ export default function ImmersiveView({ state, network, act, embedKey, job, onEx
   const [pos, setPos] = useState(state.seekerPos);
   const [live, setLive] = useState(false);
   const dragRef = useRef(null);
+  const lastMoveRef = useRef(Date.now()); // when the pano last changed position
+  const lookRef = useRef(null);            // heading when the player started looking
 
   const [phoneOpen, setPhoneOpen] = useState(false);
   const [app, setApp] = useState('home'); // 'home' | 'bus' | 'maps' | 'texts'
@@ -103,9 +106,12 @@ export default function ImmersiveView({ state, network, act, embedKey, job, onEx
     const pano = panoRef.current, svc = svcRef.current;
     if (!pano) return;
     if (!svc) { pano.setPosition({ lat: loc.lat, lng: loc.lng }); return; }
-    const source = window.google?.maps?.StreetViewSource?.OUTDOOR;
+    // Google's own street-level imagery only — user photospheres are often
+    // indoors, mislocated, or render black
+    const SV = window.google?.maps?.StreetViewSource;
+    const src = SV?.GOOGLE ? { sources: [SV.GOOGLE, SV.OUTDOOR].filter(Boolean) } : SV?.OUTDOOR ? { source: SV.OUTDOOR } : {};
     const tryRadius = (radius, next) => svc.getPanorama(
-      { location: { lat: loc.lat, lng: loc.lng }, radius, ...(source ? { source } : {}) },
+      { location: { lat: loc.lat, lng: loc.lng }, radius, ...src },
       (data, status) => {
         if (status === 'OK' && data?.location?.pano) pano.setPano(data.location.pano);
         else if (next) next();
@@ -127,10 +133,20 @@ export default function ImmersiveView({ state, network, act, embedKey, job, onEx
         fullscreenControl: false, motionTracking: false, enableCloseButton: false, linksControl: true,
       });
       panoRef.current = pano;
+      if (import.meta.env.DEV) window.__pano = pano;
       svcRef.current = new maps.StreetViewService();
       setLive(true);
-      pano.addListener('pov_changed', () => setHeading(pano.getPov().heading));
+      pano.addListener('pov_changed', () => {
+        const h = pano.getPov().heading;
+        setHeading(h);
+        // a real look-around (not the camera settling after a pano loads)
+        if (Date.now() - lastMoveRef.current > 1500) {
+          if (lookRef.current == null) lookRef.current = h;
+          else if (Math.abs(norm(h - lookRef.current)) > 35) emitUi('look');
+        }
+      });
       pano.addListener('position_changed', () => {
+        lastMoveRef.current = Date.now();
         const p = pano.getPosition();
         if (!p) return;
         const np = { lat: p.lat(), lng: p.lng() };
@@ -163,6 +179,7 @@ export default function ImmersiveView({ state, network, act, embedKey, job, onEx
   const onDown = (e) => { if (!live) dragRef.current = { x: e.clientX, h: heading }; };
   const onMove = (e) => {
     if (!dragRef.current) return;
+    if (Math.abs(e.clientX - dragRef.current.x) > 60) emitUi('look');
     setHeading((((dragRef.current.h + (e.clientX - dragRef.current.x) * 0.25) % 360) + 360) % 360);
   };
   const onUp = () => { dragRef.current = null; };
@@ -176,6 +193,9 @@ export default function ImmersiveView({ state, network, act, embedKey, job, onEx
 
   // arriving at a new station (or boarding) closes the bus scene
   useEffect(() => { setBusScene(false); }, [seekerStation, aboard]);
+
+  // let the tutorial see which screen the player is on
+  useEffect(() => { emitUi('screen', { phoneOpen, app, busScene }); }, [phoneOpen, app, busScene]);
 
   const openApp = (which) => {
     // the Transit app at the stop opens the immersive "bus rolling up" scene
@@ -259,7 +279,7 @@ export default function ImmersiveView({ state, network, act, embedKey, job, onEx
         <>
           {confirmed ? (
             <EndgameView state={state} network={network} act={actRef.current} latestPhoto={latestPhoto} livePos={pos}
-              theme={phoneTheme} onDropPin={dropPin} onPhoto={() => latestPhoto && setLightbox(latestPhoto)} />
+              ruledOut={ruledOut} theme={phoneTheme} onDropPin={dropPin} onPhoto={() => latestPhoto && setLightbox(latestPhoto)} />
           ) : (
             <>
               {ruledOut && <div className="imm-warning">⚠ Your answers have ruled out this spot</div>}
@@ -274,7 +294,7 @@ export default function ImmersiveView({ state, network, act, embedKey, job, onEx
 
               {/* highlight the boarding zone: you're at the stop — tap to board */}
               {nearStop && !phoneOpen && (
-                <button className="board-prompt" onClick={() => openApp('bus')} title="Catch your ride">
+                <button className="board-prompt" data-tut="board" onClick={() => openApp('bus')} title="Catch your ride">
                   <span className="bp-ring" />
                   <span className="bp-icon">{vehicle === 'bus' ? '🚏' : '🚉'}</span>
                   <span className="bp-label">You're at the {vehicle === 'bus' ? 'bus stop' : 'platform'} — tap to board</span>
@@ -283,20 +303,20 @@ export default function ImmersiveView({ state, network, act, embedKey, job, onEx
 
               <div className="imm-sv-controls">
                 <button className="sv-btn ghost" onClick={walkHere} title="Move your standing point to here">Walk here</button>
-                <button className="sv-btn" onClick={dropPin} title="Walk here and tag the hider">📍 Drop pin</button>
+                <button className="sv-btn" data-tut="drop" onClick={dropPin} title="Walk here and tag the hider">📍 Drop pin</button>
               </div>
             </>
           )}
 
           {!phoneOpen && (
-            <button className="phone-launch" onClick={() => openApp('home')} title="Open your phone">
+            <button className="phone-launch" data-tut="phone" onClick={() => openApp('home')} title="Open your phone">
               <span className="pl-icon">📱</span>
               <span className="pl-label">Phone</span>
             </button>
           )}
 
           {phoneOpen && app === 'maps' && (
-            <MapsApp network={network} state={state} theme={phoneTheme} act={actRef.current} onBack={goHome}
+            <MapsApp network={network} state={state} livePos={pos} theme={phoneTheme} act={actRef.current} onBack={goHome}
               savedView={mapsViewRef.current} onView={(v) => { mapsViewRef.current = v; }} />
           )}
 
@@ -311,6 +331,7 @@ export default function ImmersiveView({ state, network, act, embedKey, job, onEx
                       title="Switch light / dark">{phoneTheme === 'dark' ? '☀' : '☾'}</button>
                     <span className="ps-coins">🪙 {state.coins}</span>
                     <span className="ps-batt" />
+                    <button className="ps-close" data-tut="phone-close" onClick={closePhone} title="Put the phone away">✕</button>
                   </span>
                 </div>
                 <div className="phone-screen">
@@ -353,15 +374,15 @@ function PhoneHome({ vehicle, study, onOpen }) {
     <div className="home-screen">
       <div className="home-clock">Field Phone</div>
       <div className="home-apps">
-        <button className="app-icon" onClick={() => onOpen('bus')}>
+        <button className="app-icon" data-tut="app-bus" onClick={() => onOpen('bus')}>
           <span className="ai-glyph bus">{vehicle === 'bus' ? '🚌' : '🚆'}</span>
           <span className="ai-name">{transitLabel}</span>
         </button>
-        <button className="app-icon" onClick={() => onOpen('maps')}>
+        <button className="app-icon" data-tut="app-maps" onClick={() => onOpen('maps')}>
           <span className="ai-glyph maps">🗺️</span>
           <span className="ai-name">Maps</span>
         </button>
-        <button className="app-icon" onClick={() => onOpen('texts')}>
+        <button className="app-icon" data-tut="app-texts" onClick={() => onOpen('texts')}>
           <span className="ai-glyph texts">💬</span>
           <span className="ai-name">Texts</span>
         </button>
@@ -523,7 +544,7 @@ function OnboardView({ state, network, onRide }) {
         <div className="ob-panel-title">Tell the driver your stop</div>
         <div className="ob-stops">
           {stops.map((s) => (
-            <button className="ob-stop" key={s.id} disabled={getting} onClick={() => getOff(s.id)}>
+            <button className="ob-stop" key={s.id} data-tut={`stop-${s.id}`} disabled={getting} onClick={() => getOff(s.id)}>
               <span className="obs-name">{s.name}</span>
               <span className="obs-time">{s.mins} min</span>
               <span className="obs-go">{getting === s.id ? '…' : 'Get off ▸'}</span>
@@ -586,7 +607,7 @@ function TextsApp({ state, network, act, hiderName, onOpenPhoto }) {
         <div className="tray-label">Tap to text a question{sending ? ' · sending…' : ''}</div>
         <div className="chip-grid">
           {chips.map((c) => (
-            <button key={c.key} className="qchip" disabled={c.disabled || sending} onClick={c.send}>
+            <button key={c.key} className="qchip" data-tut={`chip-${c.key}`} disabled={c.disabled || sending} onClick={c.send}>
               <span className="qc-label">{c.label}</span>
               <span className="qc-cost">{c.cost === 0 ? 'free' : `${c.cost}🪙`}</span>
             </button>
@@ -597,7 +618,7 @@ function TextsApp({ state, network, act, hiderName, onOpenPhoto }) {
   );
 }
 
-function MapsApp({ network, state, theme, act, onBack, savedView, onView }) {
+function MapsApp({ network, state, livePos, theme, act, onBack, savedView, onView }) {
   const [sel, setSel] = useState(null);
   const [pendingWalk, setPendingWalk] = useState(null);
   const [walkMsg, setWalkMsg] = useState(null);
@@ -618,7 +639,8 @@ function MapsApp({ network, state, theme, act, onBack, savedView, onView }) {
   const active = tools.find((t) => t.key === sel);
   const toggle = (key) => setSel((cur) => (cur === key ? null : key));
 
-  const here = state.seekerPos;
+  // where you're really standing — follows you as you walk around in Street View
+  const here = livePos || state.seekerPos;
   const onMapClick = (lat, lng) => {
     const d = metersBetween({ lat, lng }, here);
     if (d > WALK_RADIUS) { setWalkMsg(`That's ${Math.round(d)}m — you can only walk ${WALK_RADIUS}m from here.`); setPendingWalk(null); return; }
@@ -724,8 +746,9 @@ function MapLegend({ lines }) {
   );
 }
 
-function EndgameView({ state, network, act, latestPhoto, livePos, theme, onDropPin, onPhoto }) {
-  const [pendingWalk, setPendingWalk] = useState(null);
+function EndgameView({ state, network, act, latestPhoto, livePos, ruledOut, theme, onDropPin, onPhoto }) {
+  const [pendingWalk, setPendingWalk] = useState(null); // where a map tap is walking you
+  const [walkNote, setWalkNote] = useState(null);
   // follow where you've wandered in Street View, so the dot + map track you live
   const here = livePos || state.seekerPos;
   const guesses = state.feed.filter((f) => f.kind === 'guess' && f.lat);
@@ -740,16 +763,21 @@ function EndgameView({ state, network, act, latestPhoto, livePos, theme, onDropP
     },
     [network, state.feed.length]
   );
-  const onMapClick = (lat, lng) => {
+  // tap the map = walk straight there (Street View follows)
+  const onMapClick = async (lat, lng) => {
     const d = metersBetween({ lat, lng }, here);
-    if (d > WALK_RADIUS) { setPendingWalk(null); return; }
-    setPendingWalk({ lat, lng, meters: Math.round(d), mins: Math.max(1, Math.ceil((d / 1000) * state.rules.WALK_PACE_MIN_PER_KM)) });
+    if (d > WALK_RADIUS) { setWalkNote(`Too far — you can walk up to ${WALK_RADIUS}m at a time (that's ${Math.round(d)}m).`); return; }
+    setWalkNote(null);
+    setPendingWalk({ lat, lng });
+    await act('walk', { lat, lng });
+    setPendingWalk(null);
   };
-  const doWalk = async () => { const p = pendingWalk; setPendingWalk(null); await act('walk', { lat: p.lat, lng: p.lng }); };
+  useEffect(() => { if (!walkNote) return; const t = setTimeout(() => setWalkNote(null), 3500); return () => clearTimeout(t); }, [walkNote]);
 
   return (
     <div className="endgame">
       <div className="eg-banner">🎯 Right station! Walk the street (or tap the map) to the exact spot, then drop your pin.</div>
+      {ruledOut && <div className="imm-warning eg-ruled">🚫 The hider can't be here — your answers rule this spot out</div>}
       <aside className="eg-side">
         {latestPhoto && (
           <div className="eg-photo" onClick={onPhoto} title="Tap to enlarge">
@@ -757,8 +785,8 @@ function EndgameView({ state, network, act, latestPhoto, livePos, theme, onDropP
             <img src={latestPhoto} alt="hider photo" />
           </div>
         )}
-        <div className="eg-map">
-          <div className="eg-panel-label">Still-possible area — tap in the ring to walk</div>
+        <div className="eg-map" data-tut="eg-map">
+          <div className="eg-panel-label">{walkNote || (pendingWalk ? 'Walking…' : 'Tap the map to walk there')}</div>
           <div className="eg-map-inner">
             <MapView
               key={`eg-${network?.id}`}
@@ -777,17 +805,10 @@ function EndgameView({ state, network, act, latestPhoto, livePos, theme, onDropP
               focus={{ lat: here.lat, lng: here.lng, zoom: 16 }}
             />
           </div>
-          {pendingWalk && (
-            <div className="eg-walkbar">
-              <span>Walk <b>{pendingWalk.meters}m</b> · ~{pendingWalk.mins} min</span>
-              <button className="mw-cancel" onClick={() => setPendingWalk(null)}>Cancel</button>
-              <button className="mw-go" onClick={doWalk}>Walk</button>
-            </div>
-          )}
         </div>
       </aside>
       <div className="eg-controls">
-        <button className="sv-btn eg-drop" onClick={onDropPin}>📍 Drop pin & tag</button>
+        <button className="sv-btn eg-drop" data-tut="drop" onClick={onDropPin}>📍 Drop pin & tag</button>
       </div>
     </div>
   );
@@ -821,7 +842,7 @@ function StopBoarding({ state, network, onBoard, onCancel }) {
                 <button className="pb-plat" onClick={() => { setIdx(i); setPlatform(i); setPhase('arriving'); }}>B{i + 1}</button>
                 <span className="pb-line" style={{ color: l.color }}>{l.name}</span>
                 <span className="pb-eta">next in {wait(l.id)} min</span>
-                <button className="pb-go" onClick={() => { setIdx(i); setPlatform(i); setPhase('arriving'); }}>Go to platform ›</button>
+                <button className="pb-go" data-tut="platform" onClick={() => { setIdx(i); setPlatform(i); setPhase('arriving'); }}>Go to platform ›</button>
               </div>
             ))}
           </div>
@@ -854,7 +875,7 @@ function StopBoarding({ state, network, onBoard, onCancel }) {
           {!isTrain && lines.length > 1 && (
             <button className="bsb-skip" onClick={skip} disabled={phase === 'boarding'}>Not mine — skip to {nextLine.name} ›</button>
           )}
-          <button className="bsb-board" onClick={board} disabled={phase === 'boarding'}>Board the {line.name}</button>
+          <button className="bsb-board" data-tut="board-line" onClick={board} disabled={phase === 'boarding'}>Board the {line.name}</button>
         </div>
       </div>
     </div>

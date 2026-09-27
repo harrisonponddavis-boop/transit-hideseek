@@ -238,7 +238,7 @@ export default function App() {
         <CareerReward job={careerReward.job} stars={careerReward.stars} payout={careerReward.payout}
           onContinue={leaveJob} />
       )}
-      {tutorialMode && state && <Tutorial state={state} onFinish={finishTutorial} />}
+      {tutorialMode && state && <Tutorial state={state} network={network} onFinish={finishTutorial} />}
       {toast && <div className="toast">{toast}</div>}
     </div>
   );

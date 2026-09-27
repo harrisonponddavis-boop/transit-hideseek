@@ -215,8 +215,9 @@ export default function MapView({
   const shadeCanvas = useRef(null);
   const shadeData = useRef(null);
   const stationMarkers = useRef({});
+  const roRef = useRef(null);
   const handlers = useRef({});
-  handlers.current = { onStationClick, onMapClick, clickMode, onViewChange };
+  handlers.current = { onStationClick, onMapClick, clickMode, onViewChange, focus };
 
   // init once network is loaded
   useEffect(() => {
@@ -273,7 +274,25 @@ export default function MapView({
     dynLayer.current = L.layerGroup().addTo(map);
     mapRef.current = map;
     if (import.meta.env.DEV) window.__ths = { map, stationMarkers: stationMarkers.current };
+
+    // Leaflet caches the container size; if the panel it lives in is still
+    // animating / laying out, clicks map to the wrong spot and "centre" is off.
+    // Re-measure whenever the box changes size, keeping the followed point centred.
+    const ro = new ResizeObserver(() => {
+      map.invalidateSize({ pan: false });
+      const f = handlers.current.focus;
+      if (f) map.setView([f.lat, f.lng], map.getZoom(), { animate: false });
+    });
+    ro.observe(containerRef.current);
+    roRef.current = ro;
   }, [network]);
+
+  // tear the map down with the component
+  useEffect(() => () => {
+    roRef.current?.disconnect();
+    mapRef.current?.remove();
+    mapRef.current = null;
+  }, []);
 
   // exclusion shade: redraw when the possible zones or theme change
   useEffect(() => {
@@ -301,7 +320,10 @@ export default function MapView({
 
   // follow the focus point (e.g. the seeker walking around in the endgame)
   useEffect(() => {
-    if (focus && mapRef.current) mapRef.current.panTo([focus.lat, focus.lng]);
+    const map = mapRef.current;
+    if (!focus || !map) return;
+    map.invalidateSize({ pan: false });
+    map.setView([focus.lat, focus.lng], map.getZoom(), { animate: true, duration: 0.35 });
   }, [focus?.lat, focus?.lng]);
 
   // dynamic layer: seeker/hider/zone/pin/guesses + tooltips

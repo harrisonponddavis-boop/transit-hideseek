@@ -26,12 +26,14 @@ const io = new Server(server, { cors: { origin: '*' }, maxHttpBufferSize: 2e6 })
 const PORT = process.env.GAME_PORT || process.env.PORT || 3001;
 
 app.use(express.json({ limit: '256kb' }));
+const tts = require('./tts');
 
 // Serve the built client in production
 const dist = path.join(__dirname, '..', 'client', 'dist');
 app.use(express.static(dist));
 // Client config (no secrets beyond the browser-safe embed key)
-app.get('/config', (_req, res) => res.json({ embedKey: EMBED_KEY, accounts: db.enabled }));
+app.get('/config', (_req, res) => res.json({ embedKey: EMBED_KEY, accounts: db.enabled, voices: tts.enabled }));
+tts.mount(app);
 
 // ---- Accounts (username + password) ------------------------------------
 // All routes degrade gracefully when the database is disabled.

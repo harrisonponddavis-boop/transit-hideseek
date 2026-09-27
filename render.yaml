@@ -15,3 +15,5 @@ services:
         sync: false
       - key: AUTH_SECRET              # signs login tokens; Render generates a strong random value
         generateValue: true
+      - key: SPEECHIFY_API_KEY        # optional: Speechify character voices (browser voices if unset)
+        sync: false

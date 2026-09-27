@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { saveMap, listMyMaps, deleteMap } from './auth';
+import { suggestLines } from './suggest';
 
 const TILE = 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}';
 const REF = 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}';
@@ -27,15 +28,20 @@ export default function MapMaker({ user, accounts, onPlay, onExit }) {
   const [msg, setMsg] = useState('');
   const [busy, setBusy] = useState(false);
   const [query, setQuery] = useState('');
+  const [sugg, setSugg] = useState(null);      // { note, stations, lines } from Suggest lines
+  const [suggPick, setSuggPick] = useState({}); // line index -> chosen
+  const [suggBusy, setSuggBusy] = useState(false);
 
   // refs so Leaflet event handlers always see current values
   const toolRef = useRef(tool); toolRef.current = tool;
   const draftRef = useRef(lineDraft); draftRef.current = lineDraft;
+  const stationsRef = useRef(stations); stationsRef.current = stations;
   const flash = (m) => { setMsg(m); setTimeout(() => setMsg(''), 3500); };
 
-  const addStation = (lat, lng) => {
+  const addStation = (lat, lng, name) => {
     const id = `s${idRef.current++}`;
-    setStations((prev) => ({ ...prev, [id]: { id, name: `Station ${Object.keys(prev).length + 1}`, lat, lng } }));
+    setStations((prev) => ({ ...prev, [id]: { id, name: name || `Station ${Object.keys(prev).length + 1}`, lat, lng } }));
+    return id;
   };
   const toggleInDraft = (id) => setLineDraft((d) => {
     if (!d) return d;
@@ -54,6 +60,17 @@ export default function MapMaker({ user, accounts, onPlay, onExit }) {
       const t = toolRef.current;
       if (t === 'station') addStation(e.latlng.lat, e.latlng.lng);
       else if (t === 'area') setArea((prev) => [...prev, [e.latlng.lat, e.latlng.lng]]);
+      else if (t === 'line') {
+        // drawing a line: tapping near a station adds it; tapping empty map
+        // drops a new station there and adds that — so you can just draw
+        const click = map.latLngToContainerPoint(e.latlng);
+        let best = null, bestD = 22;
+        for (const s of Object.values(stationsRef.current)) {
+          const d = click.distanceTo(map.latLngToContainerPoint([s.lat, s.lng]));
+          if (d < bestD) { bestD = d; best = s.id; }
+        }
+        toggleInDraft(best || addStation(e.latlng.lat, e.latlng.lng));
+      }
     });
     mapRef.current = map;
     return () => { map.remove(); mapRef.current = null; };
@@ -74,13 +91,22 @@ export default function MapMaker({ user, accounts, onPlay, onExit }) {
     // line being drawn
     if (lineDraft && lineDraft.length >= 2) {
       const pts = lineDraft.map((id) => stations[id]).filter(Boolean).map((s) => [s.lat, s.lng]);
-      L.polyline(pts, { color: '#111', weight: 3, dashArray: '4 6' }).addTo(lg);
+      L.polyline(pts, { color: LINE_COLORS[lines.length % LINE_COLORS.length], weight: 5, dashArray: '6 6' }).addTo(lg);
+    }
+    // suggested lines (preview)
+    if (sugg) {
+      sugg.lines.forEach((l, i) => {
+        const pts = l.stops.map((id) => sugg.stations[id] || stations[id]).filter(Boolean).map((s) => [s.lat, s.lng]);
+        if (pts.length < 2) return;
+        L.polyline(pts, { color: l.color, weight: suggPick[i] ? 6 : 3, opacity: suggPick[i] ? 0.9 : 0.45, dashArray: '8 6' }).addTo(lg);
+        pts.forEach((p) => L.circleMarker(p, { radius: 4, weight: 1, color: '#0b0d11', fillColor: '#fff', fillOpacity: suggPick[i] ? 1 : 0.6, interactive: false }).addTo(lg));
+      });
     }
     // stations
     Object.values(stations).forEach((s) => {
       const inDraft = lineDraft && lineDraft.includes(s.id);
       const m = L.circleMarker([s.lat, s.lng], {
-        radius: 7, weight: 2, color: '#0b0d11',
+        radius: 9, weight: 2, color: '#0b0d11', bubblingMouseEvents: false,
         fillColor: inDraft ? '#ffd23f' : '#4b9fff', fillOpacity: 1,
       }).addTo(lg);
       m.bindTooltip(s.name, { permanent: false, direction: 'top' });
@@ -89,7 +115,7 @@ export default function MapMaker({ user, accounts, onPlay, onExit }) {
         if (toolRef.current === 'line' && draftRef.current) toggleInDraft(s.id);
       });
     });
-  }, [stations, lines, area, lineDraft]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [stations, lines, area, lineDraft, sugg, suggPick]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { if (accounts && user) listMyMaps().then(setMyMaps); }, [accounts, user]);
 
@@ -102,6 +128,46 @@ export default function MapMaker({ user, accounts, onPlay, onExit }) {
     setLineDraft(null); setTool('station');
   };
   const cancelLine = () => { setLineDraft(null); setTool('station'); };
+
+  // ---- suggested lines: real OSM routes, or a recommended line ----
+  const runSuggest = async () => {
+    const map = mapRef.current; if (!map || suggBusy) return;
+    const b = map.getBounds();
+    setSuggBusy(true); setSugg(null);
+    try {
+      const r = await suggestLines({ north: b.getNorth(), south: b.getSouth(), east: b.getEast(), west: b.getWest() }, vehicle, stations, lines);
+      setSugg(r);
+      setSuggPick(Object.fromEntries(r.lines.map((_, i) => [i, i === 0])));
+    } catch (e) { flash(e.message || 'Could not fetch suggestions'); }
+    setSuggBusy(false);
+  };
+  const addSuggested = () => {
+    if (!sugg) return;
+    const chosen = sugg.lines.filter((_, i) => suggPick[i]);
+    if (!chosen.length) { flash('Tick at least one line to add'); return; }
+    const nextStations = { ...stations };
+    const idFor = {}; // suggestion station id -> map station id
+    const resolve = (sid) => {
+      if (nextStations[sid] && !sugg.stations[sid]) return sid; // already one of yours
+      if (idFor[sid]) return idFor[sid];
+      const s = sugg.stations[sid];
+      // reuse one of your stations if it's basically the same spot
+      const near = Object.values(nextStations).find((x) => Math.abs(x.lat - s.lat) < 0.0006 && Math.abs(x.lng - s.lng) < 0.0008);
+      if (near) return (idFor[sid] = near.id);
+      const id = `s${idRef.current++}`;
+      nextStations[id] = { id, name: s.name, lat: s.lat, lng: s.lng };
+      return (idFor[sid] = id);
+    };
+    const newLines = chosen.map((l, k) => {
+      const stops = [];
+      for (const sid of l.stops) { const id = resolve(sid); if (stops[stops.length - 1] !== id) stops.push(id); }
+      return { id: `L${Date.now().toString(36)}${k}`, name: l.name.replace(/^Recommended: connect your stations$/, 'Recommended line').replace(/^Recommended: /, ''), color: l.color, stops };
+    }).filter((l) => l.stops.length >= 2);
+    setStations(nextStations);
+    setLines((prev) => [...prev, ...newLines]);
+    setSugg(null);
+    flash(`Added ${newLines.length} line${newLines.length === 1 ? '' : 's'} ✓`);
+  };
 
   const removeStation = (id) => {
     setStations((prev) => { const n = { ...prev }; delete n[id]; return n; });
@@ -179,14 +245,34 @@ export default function MapMaker({ user, accounts, onPlay, onExit }) {
               <button className="ghost" onClick={cancelLine}>Cancel</button>
             </>
           ) : (
-            <button className="ghost" onClick={startLine} disabled={stationList.length < 2}>➕ New line</button>
+            <button className="ghost" onClick={startLine}>➕ New line</button>
           )}
           <button className={tool === 'area' ? '' : 'ghost'} onClick={() => { setTool('area'); setLineDraft(null); }}>⬡ Area</button>
           {tool === 'area' && area.length > 0 && <button className="ghost" onClick={() => setArea([])}>Clear area</button>}
+          <button className="mm-suggest" onClick={runSuggest} disabled={suggBusy}>{suggBusy ? 'Thinking…' : '✨ Suggest lines'}</button>
         </div>
-        <div className="mm-hint">
+        {sugg && (
+          <div className="mm-sugg">
+            <div className="mm-sugg-head">✨ {sugg.note}</div>
+            <div className="mm-sugg-list">
+              {sugg.lines.map((l, i) => (
+                <label className="mm-sugg-row" key={i}>
+                  <input type="checkbox" checked={!!suggPick[i]} onChange={(e) => setSuggPick((p) => ({ ...p, [i]: e.target.checked }))} />
+                  <span className="mm-dot" style={{ background: l.color }} />
+                  <span className="mm-sugg-name">{l.name}</span>
+                  <span className="hint" style={{ fontSize: 11 }}>{l.stops.length} stops</span>
+                </label>
+              ))}
+            </div>
+            <div className="row" style={{ gap: 6 }}>
+              <button className="small" onClick={addSuggested}>Add to my map</button>
+              <button className="small ghost" onClick={() => setSugg(null)}>Dismiss</button>
+            </div>
+          </div>
+        )}
+        <div className="mm-hint" style={sugg ? { display: 'none' } : undefined}>
           {tool === 'station' && 'Click the map to drop a station. Zoom into a real city so it has Street View.'}
-          {tool === 'line' && 'Tap stations in order to connect them into a line. Tap the last one again to undo, then Finish.'}
+          {tool === 'line' && 'Drawing a line: tap stations in order — or tap empty map to drop a new stop there. Tap the last one again to undo, then ✓ Finish.'}
           {tool === 'area' && 'Click to outline your play area (optional — used later for auto-importing real transit).'}
         </div>
         {msg && <div className="mm-msg">{msg}</div>}

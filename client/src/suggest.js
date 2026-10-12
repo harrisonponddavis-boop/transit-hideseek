@@ -10,15 +10,35 @@ const MAX_LINES = 8;
 // heavier rail first — metros before trams / cable cars
 const RANK = { subway: 0, light_rail: 1, train: 2, monorail: 3, tram: 4, bus: 0, trolleybus: 1 };
 
-// Routed through our own server, which tries several Overpass mirrors with the
-// User-Agent they require (the public instances block browser CORS / no-UA).
+// These three load-balanced Overpass nodes allow browser (CORS) requests, so
+// we hit them straight from the user's own connection — public Overpass rate-
+// limits datacenter IPs (like our server) but not a home connection. If every
+// node is overloaded we fall back to the server proxy as a last resort.
+const DIRECT = [
+  'https://lz4.overpass-api.de/api/interpreter',
+  'https://overpass-api.de/api/interpreter',
+  'https://z.overpass-api.de/api/interpreter',
+];
+async function hit(url, q, body, headers) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 30000);
+  try {
+    const r = await fetch(url, { method: 'POST', headers, body, signal: ctrl.signal });
+    if (!r.ok) return null;
+    const txt = await r.text();
+    try { return JSON.parse(txt); } catch { return null; } // HTML/XML error page
+  } catch { return null; } finally { clearTimeout(timer); }
+}
 async function overpass(q) {
-  const r = await fetch('/osm/overpass', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ q }),
-  });
-  if (!r.ok) throw new Error('OpenStreetMap is busy right now — give it a minute and try again.');
-  return r.json();
+  const form = 'data=' + encodeURIComponent(q);
+  for (const url of DIRECT) {
+    const d = await hit(url, q, form, { 'Content-Type': 'application/x-www-form-urlencoded' });
+    if (d) return d;
+  }
+  // last resort: our server proxy (sends a User-Agent + tries more mirrors)
+  const d = await hit('/osm/overpass', q, JSON.stringify({ q }), { 'Content-Type': 'application/json' });
+  if (d) return d;
+  throw new Error('OpenStreetMap is busy right now — give it a minute and try again.');
 }
 
 const bboxStr = (b) => `${b.south},${b.west},${b.north},${b.east}`;

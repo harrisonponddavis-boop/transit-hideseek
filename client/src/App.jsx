@@ -138,6 +138,13 @@ export default function App() {
     setNetwork(null);
   };
 
+  // A shareable "…/?tutorial=1" link drops a friend straight into the tutorial.
+  useEffect(() => {
+    try {
+      if (new URLSearchParams(window.location.search).get('tutorial') === '1') startTutorial();
+    } catch { /* ignore */ }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Play a player-made map: set the network locally, then start a custom solo hunt.
   const playCustomMap = async (def) => {
     setImmersive(true);

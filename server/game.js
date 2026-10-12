@@ -263,6 +263,7 @@ function placeTutorialHider(game) {
   game.tutorial = true;
   const r = setHider(game, SOLO.BOT_ID, target, s.lat, s.lng);
   game.winRadius = 100;
+  game.coins = 45; // a comfortable budget so a learner never stalls on coins
   return r;
 }
 

@@ -79,6 +79,41 @@ app.get('/leaderboard/:city', h(async (req, res) => {
   res.json({ scores: await auth.topScores(req.params.city, 20) });
 }));
 
+// Overpass proxy for the Map Maker's "Suggest lines" (real OSM transit).
+// The public instances block browser CORS and 406 requests with no User-Agent,
+// so we fetch server-side and fall across mirrors until one answers.
+const OVERPASS_MIRRORS = [
+  'https://overpass-api.de/api/interpreter',
+  'https://lz4.overpass-api.de/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
+  'https://z.overpass-api.de/api/interpreter',
+];
+app.post('/osm/overpass', h(async (req, res) => {
+  const q = String((req.body || {}).q || '');
+  if (!q.startsWith('[out:json]') || q.length > 4000) return res.status(400).json({ error: 'bad query' });
+  for (const url of OVERPASS_MIRRORS) {
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 30000);
+      const r = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'User-Agent': 'transit-hideseek/1.0 (hobby game; map maker suggest-lines)',
+        },
+        body: 'data=' + encodeURIComponent(q),
+        signal: ctrl.signal,
+      });
+      clearTimeout(timer);
+      if (!r.ok) continue;
+      const txt = await r.text();
+      let json; try { json = JSON.parse(txt); } catch { continue; }
+      return res.json(json);
+    } catch { /* network/timeout/abort — try the next mirror */ }
+  }
+  res.status(503).json({ error: 'OpenStreetMap is busy' });
+}));
+
 // Player-made maps
 app.get('/me/maps', requireAuth, h(async (req, res) => {
   res.json({ maps: await auth.listMyMaps(req.uid) });

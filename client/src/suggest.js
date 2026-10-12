@@ -5,19 +5,19 @@
 // area's main axis, spaced like a proper transit line.
 import { metersBetween } from './solver';
 
-const OVERPASS = 'https://overpass-api.de/api/interpreter';
 const COLORS = ['#e2231a', '#0077c8', '#009b3a', '#f9a01b', '#7a3fbf', '#00b3b3', '#e2007a', '#66421b'];
 const MAX_LINES = 8;
 // heavier rail first — metros before trams / cable cars
 const RANK = { subway: 0, light_rail: 1, train: 2, monorail: 3, tram: 4, bus: 0, trolleybus: 1 };
 
+// Routed through our own server, which tries several Overpass mirrors with the
+// User-Agent they require (the public instances block browser CORS / no-UA).
 async function overpass(q) {
-  const r = await fetch(OVERPASS, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: 'data=' + encodeURIComponent(q),
+  const r = await fetch('/osm/overpass', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ q }),
   });
-  if (!r.ok) throw new Error(r.status === 429 ? 'OpenStreetMap is busy — try again in a minute' : `OpenStreetMap error ${r.status}`);
+  if (!r.ok) throw new Error('OpenStreetMap is busy right now — give it a minute and try again.');
   return r.json();
 }
 
